@@ -157,7 +157,7 @@ class pipeline():
             0] + '_overall_ourcorrected_labels.mrc'
         myimage_labels = mrcfile.open(mylabel_path).data.astype(np.uint16)
         self.corrected_labels=myimage_labels
-        self.corrected_labels = prepyto.fast_pacman_killer(myimage_labels)
+        # self.corrected_labels = prepyto.fast_pacman_killer(myimage_labels)
 
         # prepyto.save_label_to_tiff(corrected_labels, path_to_file, folder_to_save, suffix='_intensity_corrected_labels')
         prepyto.save_label_to_mrc(self.corrected_labels, self.path_to_file, self.folder_to_save, suffix='_overall_ourcorrected_labels')
