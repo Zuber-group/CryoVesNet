@@ -22,10 +22,10 @@ import complete_vesicle_segmentation
 
 class pipeline():
 
-
     def __init__(self,path_to_folder):
 
-        print("The pipeline is created for ",path_to_folder)
+        print("PIPELINE: the pipeline is created for ",path_to_folder)
+        print(os.getcwd())
         self.path_to_folder=path_to_folder
 
         os.chdir(self.path_to_folder)
@@ -39,15 +39,18 @@ class pipeline():
         print(self.path_to_file)
         self.volume_threshold_of_vesicle = prepyto.min_volume_of_vesicle(self.path_to_file)
         os.chdir('..')
+        print(os.getcwd())
 
     def run_deep(self):
+        print("PIPELINE: if there is less than 7 file in ./deep directory it gonna generate the oytput of deep network again, we are in " + os.getcwd())
         print(self.path_to_folder)
         if not os.path.exists('./'+self.path_to_folder+'/deep') or len(list(os.walk('./'+self.path_to_folder+'/deep'))[0][2])<7:
             complete_vesicle_segmentation.vesicle_segmentation(self.path_to_folder)
 
     def setup_prepyto_dir(self):
-        if not os.path.exists('./prepyto'):
-            os.mkdir('prepyto')
+        print("PIPELINE: setup prepyto directory, we are in:" +os.getcwd())
+        if not os.path.exists('./'+ self.path_to_folder +'/prepyto'):
+            os.mkdir('./'+  self.path_to_folder +'/prepyto')
 
         # image_dir = os.path.splitext(os.path.split(path_to_file)[0])[0]
         image_dir = '.'
@@ -59,6 +62,7 @@ class pipeline():
         print(os.path.normpath(self.folder_to_save) + '/' + os.path.splitext(os.path.split(self.path_to_file)[1])[0])
 
     def zoom(self):
+        print("PIPELINE: here we enlarge the mask to work with real size of the image, we are in " + os.getcwd())
         print(os.getcwd())
         os.chdir('./' + self.path_to_folder + '/deep')
         cwd = Path('.')
@@ -101,7 +105,8 @@ class pipeline():
 
 
     def outcell_remover(self):
-        print(os.getcwd())
+        print("PIPELINE: we gonna remove outside of the cell labels, we are in " + os.getcwd())
+        # print(os.getcwd())
         # os.chdir('./' + image_dir)
         # print(os.getcwd())
         os.system('imodmop -mode 1 -o 1 -mask 1 cell_outline.mod '+self.image_name+' cytomask.mrc')
@@ -117,6 +122,8 @@ class pipeline():
 
     def thereshold_tunner(self):
 
+        # TODO: we can treat with small vesicles outside of this method (or replicate as method to have this functionality separately)
+        print("PIPELINE: find find threshold for each vesicle, we are in (its turn off!) " + os.getcwd())
         # prepyto.save_label_to_tiff(clean_labels,path_to_file,folder_to_save,suffix='_corrected_labels')
         prepyto.save_label_to_mrc(self.clean_labels, self.path_to_file, self.folder_to_save, suffix='_corrected_labels')
 
@@ -146,6 +153,7 @@ class pipeline():
 
 
     def label_convexer(self):
+        print("PIPELINE: pacman killer!, we are in (its turn off!)  " + os.getcwd())
         mylabel_path = self.folder_to_save + os.path.splitext(os.path.split(self.path_to_file)[1])[
             0] + '_overall_ourcorrected_labels.mrc'
         myimage_labels = mrcfile.open(mylabel_path).data.astype(np.uint16)
@@ -158,8 +166,7 @@ class pipeline():
 
 
     def interactive_cleaner(self):
-
-
+        print("PIPELINE: interactive cleaning till close the nappari, we are in " + os.getcwd())
 
         # # image_path = image_path = 'mask_133/Dummy_133_processed.tiff'
         mylabel_path = self.folder_to_save + os.path.splitext(os.path.split(self.path_to_file)[1])[
@@ -174,6 +181,7 @@ class pipeline():
 
 
     def sphere_vesicles(self):
+        print("PIPELINE: this method fit sphere on vesicles, we are in " + os.getcwd())
 
         target_label_path = self.folder_to_save+ os.path.splitext(os.path.split(self.path_to_file)[1])[0]+'_overall_ourcorrected_labels_mancorr.mrc'
 
@@ -192,10 +200,14 @@ class pipeline():
 
 
     def visualization_old_new(self):
+        # TODO: this method is better to get some argument instead of static argument and show them in nappari
+        print("PIPELINE: visualization , we are in " + os.getcwd())
         visualization.viz_labels(self.real_image, [self.clean_labels, self.corrected_labels], ['Old', 'New'])
 
 
     def making_pyto_stuff(self):
+        # TODO: we should seperate this method to smaller method for repreducibilty!
+        print("PIPELINE: generate pyto files , we are in " + os.getcwd())
         mrc_cleaner.query_yes_no("continue?")
         # os.chdir('./')
         print(os.getcwd())
