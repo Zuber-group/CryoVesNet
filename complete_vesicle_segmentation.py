@@ -4,13 +4,15 @@ from pathlib import Path
 import tensorflow as tf
 
 def vesicle_segmentation(path_to_folder):
-    os.chdir('..')
+    os.chdir('../..')
     dataset_dir = os.getcwd()
     unet_weigth_path = dataset_dir + '/weights/weights.h5'
     os.chdir('./data/'+path_to_folder)
-    if os.path.exists('./' + path_to_folder + '/deep'):
-        os.remove('deep')
-        os.mkdir('deep')
+    print("XXXXXXXX",os.getcwd())
+    if os.path.exists('./deep'):
+        print("XXXXXXXX", os.getcwd())
+        os.rmdir('deep')
+    os.mkdir('deep')
     cwd = Path('.')
     path_generator = cwd.glob('*.rec')
     file_name = ([str(x) for x in path_generator])[0]

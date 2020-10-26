@@ -38,19 +38,18 @@ class pipeline():
         self.path_to_file = './' + file_name
         print(self.path_to_file)
         self.volume_threshold_of_vesicle = prepyto.min_volume_of_vesicle(self.path_to_file)
-        os.chdir('..')
         print(os.getcwd())
 
     def run_deep(self):
         print("PIPELINE: if there is less than 7 file in ./deep directory it gonna generate the oytput of deep network again, we are in " + os.getcwd())
         print(self.path_to_folder)
-        if not os.path.exists('./'+self.path_to_folder+'/deep') or len(list(os.walk('./'+self.path_to_folder+'/deep'))[0][2])<7:
+        if not os.path.exists('deep') or len(list(os.walk('./deep'))[0][2])<7:
             complete_vesicle_segmentation.vesicle_segmentation(self.path_to_folder)
 
     def setup_prepyto_dir(self):
         print("PIPELINE: setup prepyto directory, we are in:" +os.getcwd())
-        if not os.path.exists('./'+ self.path_to_folder +'/prepyto'):
-            os.mkdir('./'+  self.path_to_folder +'/prepyto')
+        if not os.path.exists('prepyto'):
+            os.mkdir('prepyto')
 
         # image_dir = os.path.splitext(os.path.split(path_to_file)[0])[0]
         image_dir = '.'
@@ -64,7 +63,7 @@ class pipeline():
     def zoom(self):
         print("PIPELINE: here we enlarge the mask to work with real size of the image, we are in " + os.getcwd())
         print(os.getcwd())
-        os.chdir('./' + self.path_to_folder + '/deep')
+        os.chdir('./deep')
         cwd = Path('.')
         mask_path = cwd.glob('*_wreal_mask.tiff')
         mask_name = [str(x) for x in mask_path][0]
@@ -158,7 +157,7 @@ class pipeline():
             0] + '_overall_ourcorrected_labels.mrc'
         myimage_labels = mrcfile.open(mylabel_path).data.astype(np.uint16)
         self.corrected_labels=myimage_labels
-        # self.corrected_labels = prepyto.fast_pacman_killer(myimage_labels)
+        self.corrected_labels = prepyto.fast_pacman_killer(myimage_labels)
 
         # prepyto.save_label_to_tiff(corrected_labels, path_to_file, folder_to_save, suffix='_intensity_corrected_labels')
         prepyto.save_label_to_mrc(self.corrected_labels, self.path_to_file, self.folder_to_save, suffix='_overall_ourcorrected_labels')
