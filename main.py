@@ -3,6 +3,7 @@
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 import os
+import sys
 import skimage
 import prepyto
 import mrc_cleaner
@@ -23,76 +24,120 @@ import complete_vesicle_segmentation
 class pipeline():
 
     def __init__(self,path_to_folder):
-
-        print("PIPELINE: the pipeline is created for ",path_to_folder)
-        print(os.getcwd())
-        self.path_to_folder=path_to_folder
-
-        os.chdir(self.path_to_folder)
-        cwd = Path('.')
-        path_generator = cwd.glob('*.rec.nad')
-        file_name = ([str(x) for x in path_generator])[0]
-        # file_name = [x.stem for x in path_generator]
-        print(file_name)
-        self.file_name=file_name
-        self.path_to_file = './' + file_name
-        print(self.path_to_file)
-        self.volume_threshold_of_vesicle = prepyto.min_volume_of_vesicle(self.path_to_file)
-        print(os.getcwd())
-
+        #BZ replaced self.path_to_folder by self.dir
+        self.dir = Path(path_to_folder).absolute()
+        print(f"PIPELINE: the pipeline is created for {self.dir}")
+        #BZ to get a clearer overview of data structure, all directory paths are defined here
+        self.deep_dir = self.dir/'deep'
+        self.save_dir = self.dir/'prepyto'
+        self.cytomask_path = self.dir/'cytomask.mrc'
+        pattern = '*.rec.nad'
+        try:
+            self.image_path = next(self.dir.glob(pattern))
+        except StopIteration:
+            print(f"Error: {self.dir} does not contain file matching the pattern {pattern}. Exiting")
+            sys.exit(1)
+        self.mancorr_path = self.save_dir/(self.image_path.stem + '_mancorr.mrc')
+        self.mancorr_clean_path = self.save_dir/(self.mancorr_path.stem + '_clean.mrc')
+        self.mylabel_path = self.save_dir/(self.image_path.stem + '_overall_ourcorrected_labels.mrc')
+        self.mylabel_mancorr_path = self.save_dir/(self.mylabel_path.stem + '_mancorr.mrc')
+        self.mylabel_mancorr_clean_path = self.save_dir/(self.mylabel_mancorr_path.stem + '_clean.mrc')
+        self.sphere_path = self.save_dir/(self.image_path.stem + '_sphere.mrc')
+        self.labels_mrc_path = self.save_dir/'labels.mrc'
+        self.last_mrc_path = None #placeholder for more flexibility in pipeline sequence
+        self.real_image = None #placeholder for real image array
+        self.deep_mask_image = None #placeholder for unet mask image array
+        self.corrected_labels = None #placeholder for corrected label array
+        self.clean_labels = None #placeholder for cleaned label array
+        self.vesicle_mod_path = self.dir/'vesicles.mod'
+        self.active_zone_mod_path = self.dir/'active_zone.mod'
+        self.cell_outline_mod_path = self.dir/'cell_outline.mod'
+        self.full_mod_path = self.dir/'merge.mod'
+        self.check_files()
+        self.volume_threshold_of_vesicle = prepyto.min_volume_of_vesicle(self.image_path)
+    def check_files(self):
+        """
+        Check if all input files exist
+        """
+        missing = []
+        for p in (self.dir, self.cytomask_path, self.image_path)
+            if not p.exists(): missing.append(str(p))
+        if len(missing):
+            err = f"""the following file(s) and/or directory(s) are missing: {", ".join(missing)}"""
+            raise IOError(err)
     def run_deep(self):
-        print("PIPELINE: if there is less than 7 file in ./deep directory it gonna generate the oytput of deep network again, we are in " + os.getcwd())
-        print(self.path_to_folder)
-        if not os.path.exists('deep') or len(list(os.walk('./deep'))[0][2])<7:
-            complete_vesicle_segmentation.vesicle_segmentation(self.path_to_folder)
-
+        """
+        Merged vesicle_segmentation and run_deep to make it a pipeline method
+        all output files are saved in self.deep_dir
+        """
+        print("PIPELINE: if there is less than 7 file in ./deep directory it gonna generate the output of deep network again, we are in " + os.getcwd())
+        print(self.dir)
+        #if not os.path.exists('deep') or len(list(os.walk('./deep'))[0][2])<7:
+        if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 7:
+            return
+        self.unet_weigth_path = self.deep_dir/'weights.h5'
+        #create deep_dir (if it does not exist)
+        self.deep_dir.mkdir(exist_ok=True)
+        #delete every file in deep_dir (not that if it contains directory it will raise a PermissionError)
+        for p in self.deep_dir.glob("*"):
+            p.unlink()
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = False
+        tf.keras.backend.set_session(tf.Session(config=config))
+        network_size = 64
+        #TODO if we uncomment the next line, we need to check paths.
+        #segment.full_segmentation(network_size, self.unet_weigth_path, self.image_path,
+        #                          self.deep_dir, rescale=0.5, gauss=True)
     def setup_prepyto_dir(self):
+        #image_dir has already been set in __init__
+        #it is self.dir
         print("PIPELINE: setup prepyto directory, we are in:" +os.getcwd())
-        if not os.path.exists('prepyto'):
-            os.mkdir('prepyto')
-
-        # image_dir = os.path.splitext(os.path.split(path_to_file)[0])[0]
-        image_dir = '.'
-        print(image_dir)
-        self.image_name = os.path.splitext(os.path.split(self.path_to_file)[1])[0]
-        # image_name=file_name
-        self.folder_to_save = image_dir + '/prepyto/'
-        print(self.folder_to_save)
-        print(os.path.normpath(self.folder_to_save) + '/' + os.path.splitext(os.path.split(self.path_to_file)[1])[0])
-
+        # if not os.path.exists('prepyto'):
+        #     os.mkdir('prepyto')
+        #changed naming from self.folder_to_save to self.save_dir to consistently use "dir"
+        # for directory.
+        self.save_dir.mkdir(exist_ok=True)
+        ## image_dir = os.path.splitext(os.path.split(path_to_file)[0])[0]
+        #image_dir = '.'
+        print(self.dir)
+        #self.image_name = os.path.splitext(os.path.split(self.path_to_file)[1])[0]
+        ## image_name=file_name
+        #self.folder_to_save = image_dir + '/prepyto/'
+        #print(self.folder_to_save)
+        print(self.save_dir)
+        #print(os.path.normpath(self.folder_to_save) + '/' + os.path.splitext(os.path.split(self.path_to_file)[1])[0])
+        print(self.image_path)
     def zoom(self):
-        print("PIPELINE: here we enlarge the mask to work with real size of the image, we are in " + os.getcwd())
-        print(os.getcwd())
-        os.chdir('./deep')
-        cwd = Path('.')
-        mask_path = cwd.glob('*_wreal_mask.tiff')
-        mask_name = [str(x) for x in mask_path][0]
-
-        self.mask_image = skimage.io.imread(mask_name)
+        print("PIPELINE: here we enlarge the mask to work with real size of the image")#, we are in " + os.getcwd())
+        #print(os.getcwd())
+        #os.chdir('./deep')
+        #cwd = Path('.')
+        #mask_path = cwd.glob('*_wreal_mask.tiff')
+        #selfmask_name = [str(x) for x in mask_path][0]
+        try:
+            self.deep_mask_path = next(self.deep_dir.glob('*_wreal_mask.tiff'))
+        except StopIteration:
+            print(f"""Error: no *_wreal_mask.tiff file found in {self.deep_dir}""")
+            sys.exit(1)
+        self.deep_mask_image = skimage.io.imread(self.deep_mask_path)
         # cleannmask_image = skimage.io.imread(image_dir + '/deep/Dummy_133_clean_mask.tiff')
-        os.chdir('../..')
-        os.chdir(self.path_to_folder)
-
-        # path_to_file = './data/133_wtko/Dummy_133.rec.nad.rec'
-
-
-
-
-        # real_image=skimage.io.imread('./Results_Dummy_133/Dummy_133.rec')
-
-        self.real_image = umic.load_raw(self.path_to_file)
-        # int_image = skimage.io.imread(image_dir + '/deep/Dummy_133_processed.tiff')
-        # image_label = skimage.io.imread(image_dir + '/deep/Dummy_133_clean_label.tiff')
-
-        print(np.shape(self.real_image))
-        print(np.shape(self.mask_image))
-        print(os.path.splitext(os.path.split(self.path_to_file)[1])[0])
-
-        self.mask_image = skimage.transform.resize(self.mask_image, output_shape=np.shape(self.real_image), preserve_range=True)
+        #os.chdir('../..')
+        #os.chdir(self.path_to_folder)
+        ## path_to_file = './data/133_wtko/Dummy_133.rec.nad.rec'
+        ## real_image=skimage.io.imread('./Results_Dummy_133/Dummy_133.rec')
+        self.real_image = umic.load_raw(self.image_path)
+        #TODO evaluate if we really need to keep the image in memory the whole time
+        #TODO same question with the deep_mask_image
+        ## int_image = skimage.io.imread(image_dir + '/deep/Dummy_133_processed.tiff')
+        ## image_label = skimage.io.imread(image_dir + '/deep/Dummy_133_clean_label.tiff')
+        print(f"real image shape is {np.shape(self.real_image)}")
+        print(f"deep mask image shape is {np.shape(self.deep_mask_image)}")
+        #print(os.path.splitext(os.path.split(self.path_to_file)[1])[0])
+        self.deep_mask_image = skimage.transform.resize(self.deep_mask_image, output_shape=np.shape(self.real_image), preserve_range=True)
         # new_image= skimage.transform.resize(int_image, output_shape=np.shape(real_image), preserve_range = True).astype(np.int16)
         new_image = self.real_image.astype(np.int16)
 
-        print(np.shape(new_image))
+        print(f"new image shape is {np.shape(new_image)}")
 
         # generate zoomed labels
         opt_th, _ = segseg.find_threshold(new_image, self.mask_image)
@@ -101,25 +146,20 @@ class pipeline():
 
         clean_mask = (255 * clean_mask).astype(np.uint8)
         self.clean_labels = clean_labels.astype(np.uint16)
-
-
     def outcell_remover(self):
         print("PIPELINE: we gonna remove outside of the cell labels, we are in " + os.getcwd())
         # print(os.getcwd())
         # os.chdir('./' + image_dir)
         # print(os.getcwd())
-        os.system('imodmop -mode 1 -o 1 -mask 1 cell_outline.mod '+self.image_name+' cytomask.mrc')
-        self.cell_outline = mrcfile.open('./cytomask.mrc').data.astype(np.uint16)
+        os.system(f"imodmop -mode 1 -o 1 -mask 1 cell_outline.mod {self.image_path} {self.cytomask_path}")
+        self.cell_outline = mrcfile.open(self.cytomask_path).data.astype(np.uint16)
+        #TODO do we need to keep self.cell_outline in memory the whole time?
         # os.chdir('../..')
-        print(os.getcwd())
+        #print(os.getcwd())
 
         # cell_outline=mrcfile.open('./'+folder_to_save+'/cytomask.mrc').data.astype(np.uint16)
-        new_clean_labels = self.clean_labels * self.cell_outline
-        self.clean_labels = new_clean_labels
-
-
-
-    def thereshold_tunner(self):
+        self.clean_labels = self.clean_labels * self.cell_outline
+    def thereshold_tunner(self):#BZ has not touched this function
 
         # TODO: we can treat with small vesicles outside of this method (or replicate as method to have this functionality separately)
         print("PIPELINE: find find threshold for each vesicle, we are in (its turn off!) " + os.getcwd())
@@ -148,106 +188,91 @@ class pipeline():
 
         # prepyto.save_label_to_tiff(corrected_labels,path_to_file,folder_to_save,suffix='_overall_ourcorrected_labels')
         prepyto.save_label_to_mrc(self.corrected_labels, self.path_to_file, self.folder_to_save, suffix='_overall_ourcorrected_labels')
-
-
-
     def label_convexer(self):
         print("PIPELINE: pacman killer!, we are in (its turn off!)  " + os.getcwd())
-        mylabel_path = self.folder_to_save + os.path.splitext(os.path.split(self.path_to_file)[1])[
-            0] + '_overall_ourcorrected_labels.mrc'
-        myimage_labels = mrcfile.open(mylabel_path).data.astype(np.uint16)
-        self.corrected_labels=myimage_labels
-        # self.corrected_labels = prepyto.fast_pacman_killer(myimage_labels)
+        #mylabel_path = self.folder_to_save + os.path.splitext(os.path.split(self.path_to_file)[1])[
+        #    0] + '_overall_ourcorrected_labels.mrc'
+        #BZ moved path definition to __init__
+        self.myimage_labels = mrcfile.open(self.mylabel_path).data.astype(np.uint16)
+        self.corrected_labels = self.myimage_labels
+        # self.corrected_labels = prepyto.fast_pacman_killer(self.myimage_labels)
 
         # prepyto.save_label_to_tiff(corrected_labels, path_to_file, folder_to_save, suffix='_intensity_corrected_labels')
-        prepyto.save_label_to_mrc(self.corrected_labels, self.path_to_file, self.folder_to_save, suffix='_overall_ourcorrected_labels')
-
-
-
-    def interactive_cleaner(self):
+        #prepyto.save_label_to_mrc(self.corrected_labels, self.path_to_file, self.folder_to_save, suffix='_overall_ourcorrected_labels')
+        prepyto.save_label_to_mrc(self.corrected_labels, self.mylabel_path)
+    def interactive_cleaner(self, corrected_labels_as_input=True):
+        """
+        starts interactive cleaner
+        :param corrected_labels_as_input: if True, use self.corrected_labels as input, else use self.myimage_labels
+        :return:
+        """
         print("PIPELINE: interactive cleaning till close the nappari, we are in " + os.getcwd())
 
         # # image_path = image_path = 'mask_133/Dummy_133_processed.tiff'
-        mylabel_path = self.folder_to_save + os.path.splitext(os.path.split(self.path_to_file)[1])[
-            0] + '_overall_ourcorrected_labels.mrc'
-        myimage_labels = mrcfile.open(mylabel_path).data.astype(np.uint16)
+        #mylabel_path = self.folder_to_save + os.path.splitext(os.path.split(self.path_to_file)[1])[
+        #    0] + '_overall_ourcorrected_labels.mrc'
+        #myimage_labels = mrcfile.open(mylabel_path).data.astype(np.uint16)
         #target_labels = myimage_labels
-        new_labels=mrc_cleaner.interactive_cleaner(self.real_image,myimage_labels)
-
-        mylabel_path=prepyto.save_label_to_mrc(new_labels,mylabel_path,self.folder_to_save,'_mancorr')
-
-        mrc_cleaner.mrc_header_cleaner(mylabel_path,self.path_to_file)
-
-
+        if corrected_labels_as_input:
+            input_labels = self.corrected_labels
+            output_path = self.mylabel_mancorr_path
+            output_clean_path = self.mylabel_mancorr_clean_path
+        else:
+            input_labels = self.myimage_labels
+            output_path = self.mancorr_path
+            output_clean_path = self.mancorr_clean_path
+        new_labels = mrc_cleaner.interactive_cleaner(self.real_image, input_labels)
+        prepyto.save_label_to_mrc(new_labels, output_path)
+        mrc_cleaner.mrc_header_cleaner(output_path, self.image_path, output_clean_path)
     def sphere_vesicles(self):
         print("PIPELINE: this method fit sphere on vesicles, we are in " + os.getcwd())
-
-        target_label_path = self.folder_to_save+ os.path.splitext(os.path.split(self.path_to_file)[1])[0]+'_overall_ourcorrected_labels_mancorr.mrc'
-
-        target_label_path= self.folder_to_save+ os.path.splitext(os.path.split(target_label_path)[1])[0]+'_clean.mrc'
-        target_labels = mrcfile.open(target_label_path).data.astype(np.uint16)
-
-        self.corrected_labels = prepyto.elipsoid_vesicles(image_label=target_labels, diOrEr=0)
-
-        # prepyto.save_label_to_tiff(clean_labels,path_to_file,folder_to_save,suffix='_elipsoid_corrected_labels')
-        path_to_last_mrc = prepyto.save_label_to_mrc(self.corrected_labels, self.path_to_file, self.folder_to_save,
-                                                     suffix='_elipsoid_corrected_labels')
-        path_to_last_mrc = prepyto.save_label_to_mrc(self.corrected_labels, self.path_to_file, '.',
-                                                     suffix='_elipsoid_corrected_labels')
-
-        self.last_mrc = mrc_cleaner.mrc_header_cleaner(path_to_last_mrc, self.path_to_file)
-
-
+        target_labels = mrcfile.open(self.mylabel_mancorr_clean_path).data.astype(np.uint16)
+        self.corrected_labels = prepyto.ellipsoid_vesicles(image_label=target_labels, diOrEr=0)
+        #TODO do we need to keep self.corrected_labels in memory?
+        #prepyto.save_label_to_tiff(clean_labels,path_to_file,folder_to_save,suffix='_ellipsoid_corrected_labels')
+        #path_to_last_mrc = prepyto.save_label_to_mrc(self.corrected_labels, self.path_to_file, self.folder_to_save,
+        #                                             suffix='_ellipsoid_corrected_labels')
+        #path_to_last_mrc = prepyto.save_label_to_mrc(self.corrected_labels, self.path_to_file, '.',
+        #                                             suffix='_ellipsoid_corrected_labels')
+        prepyto.save_label_to_mrc(self.corrected_labels, self.sphere_path)
+        self.last_mrc_path = mrc_cleaner.mrc_header_cleaner(self.sphere_path, self.image_path, self.sphere_path)
     def visualization_old_new(self):
         # TODO: this method is better to get some argument instead of static argument and show them in nappari
         print("PIPELINE: visualization , we are in " + os.getcwd())
         visualization.viz_labels(self.real_image, [self.clean_labels, self.corrected_labels], ['Old', 'New'])
-
-
     def making_pyto_stuff(self):
-        # TODO: we should seperate this method to smaller method for repreducibilty!
+        # TODO: we should separate this method to smaller method for reproducibilty!
         print("PIPELINE: generate pyto files , we are in " + os.getcwd())
+        #TODO: What is the point of the next line?
         mrc_cleaner.query_yes_no("continue?")
         # os.chdir('./')
         print(os.getcwd())
+        #TODO: What is the point of the next line?
         yesOrNo = mrc_cleaner.query_yes_no("We can wait here for a while! do you want to pick by hand also?")
-        print("imodauto -f 3 -m 1 -h 0 " + os.path.splitext(os.path.split(self.last_mrc)[1])[0] + ".mrc vesicles.mod")
-        os.system("imodauto -f 3 -m 1 -h 0 " + os.path.splitext(os.path.split(self.last_mrc)[1])[0] + ".mrc vesicles.mod")
-        os.system("imodjoin -c cell_outline.mod active_zone.mod merge1.mod")
-        os.system("imodjoin -c merge1.mod vesicles.mod merge2.mod")
+        print(f"imodauto -f 3 -m 1 -h 0 {self.last_mrc_path} {self.vesicle_mod_path}")
+        os.system(f"imodauto -f 3 -m 1 -h 0 {self.last_mrc_path} {self.vesicles_mod_path}")
+        os.system(f"imodjoin -c {self.cell_outline_mod_path} {self.active_zone_mod_path} merge1.mod")
+        os.system(f"imodjoin -c merge1.mod {self.vesicle_mod_path} merge2.mod")
         handPick = False
         while yesOrNo:
             # these thing not general for all the files!!!!!
-            os.system('imod -W '+self.file_name+' merge2.mod')
+            os.system(f'imod -W {self.img_path} merge2.mod')
             handPick = mrc_cleaner.query_yes_no("Is the mod file ready?")
             if handPick:
                 break
             else:
                 yesOrNo = mrc_cleaner.query_yes_no("We can wait here for a while! do you want to pick by hand also?")
-
         # os.chdir('../..')
         print(os.getcwd())
+       # sv = 'Results_Vesicles/20200615/bubu_ellipsoid.mod'
 
-        cytomod = 'cell_outline.mod'
-        az = 'active_zone.mod'
-
-        # sv = 'Results_Vesicles/20200615/bubu_elipsoid.mod'
-
-        fullmod = 'merge.mod'
-
-        tomogram = self.image_name
-        nad = tomogram + '.nad'
-        print(tomogram)
-
-        cytomask = 'cytomask.mrc'
-        az_mask = 'azmask.mrc'
         # sv_mask = './before_sphere.mrc'
-        sv_mask = self.last_mrc
+        sv_mask = self.last_mrc_path
 
-        # sv_mask_zoom_out = './Dummy_133_elipsoid_corrected_labels.mrc'
+        # sv_mask_zoom_out = './Dummy_133_ellipsoid_corrected_labels.mrc'
         # sv_mask_CV = 'mancorr_sv.mrc'
 
-        labels_out = self.folder_to_save + 'labels.mrc'
+
 
         base_dir = os.path.abspath('.')
         pyto_base_dir = os.path.join(base_dir, '')
@@ -309,13 +334,13 @@ class pipeline():
         labels = np.maximum(initial_labels, sv_mask)
         print(f"number of vesicles: {sv_label.max() - 9}")
 
-        with mrcfile.new(labels_out, overwrite=True) as mrc:
-            tomo = mrcfile.open(self.last_mrc)
+        with mrcfile.new(self.labels_mrc_path, overwrite=True) as mrc:
+            tomo = mrcfile.open(self.last_mrc_path)
             mrc.set_data(labels)
             mrc.voxel_size = tomo.voxel_size
 
         # double check
-        labels = mrcfile.open(labels_out).data
+        labels = mrcfile.open(self.labels_mrc_path).data
         label_index, label_size = np.unique(labels, return_counts=True)
         sizes_labels = dict(zip(*(label_index, label_size)))
 
@@ -367,41 +392,55 @@ class pipeline():
         new_labels = myLookup[temp_labels]
         # in future save to labels_out but for now we use another filename
         # and open tomogram instead of 3d/Dummy_133.mrc:
-        with mrcfile.new(labels_out, overwrite=True) as mrc:
-            tomo = mrcfile.open(self.last_mrc)
+        with mrcfile.new(self.labels_mrc_path, overwrite=True) as mrc:
+            tomo = mrcfile.open(self.last_mrc_path)
             mrc.set_data(new_labels.astype(np.int16, copy=False))
             mrc.voxel_size = tomo.voxel_size
             mrc.header['origin'] = tomo.header['origin']
 
-
-
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    os.chdir('./data')
-    dataset_dir = os.getcwd()
-    datasetname_lst=os.listdir('.')
-    dataset_lst=[dataset_dir+x for x in datasetname_lst]
-    print("Which dataset are we working on?")
-    [print(x) for x in datasetname_lst]
-    print("?")
-    choice = input()
-    working_datset_index=datasetname_lst.index(choice)
+    base_dir = Path().absolute()
+    try:
+        os.chdir('data')
+    except FileNotFoundError:
+        print(f"Error: {base_dir} does not contain a \"data\" sub-directory called. Exiting")
+        sys.exit(1)
+    #dataset_dir = os.getcwd()
+    dataset_dir = Path().absolute()
+    #datasetname_lst=os.listdir('.')
+    #dataset_lst=[dataset_dir+x for x in datasetname_lst]
+    dataset_lst = [e for e in dataset_dir.iterdir()]
+    while True:
+        print(f"Which dataset are we working on? Please enter a number between 0 and {len(dataset_lst)-1}")
+        #[print(x) for x.name in dataset_lst]
+        for i, p in enumerate(dataset_lst):
+            print(f"{i}: {p.name}")
+        print("?")
+        try:
+            choice = int(input())
+            dataset_lst[choice]
+            break #if no exception has been triggered, then exit the while loop and execute the rest
+        except (ValueError, KeyError):
+            print(f"Error: please chose a number between 0 and and {len(dataset_lst)-1}")
+    #working_datset_index=datasetname_lst.index(choice)
     # print(working_datset_index)
-    myPipeline=pipeline(datasetname_lst[working_datset_index])
+    #myPipeline=pipeline(datasetname_lst[working_datset_index])
+    myPipeline = pipeline(dataset_lst[choice])
     # for dataset in dataset_lst:
     #     pipeline(dataset)
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
-    myPipeline.run_deep()
-    myPipeline.setup_prepyto_dir()
-    myPipeline.zoom()
-    myPipeline.outcell_remover()
+    myPipeline.run_deep() #BZ cleaned up (except segment.full_segmentation)
+    myPipeline.setup_prepyto_dir() #BZ cleaned up
+    myPipeline.zoom() #BZ cleaned up (see if some of the object properties (np array))
+    myPipeline.outcell_remover() #BZ cleaned up
     # myPipeline.thereshold_tunner()
-    myPipeline.label_convexer()
-    myPipeline.interactive_cleaner()
-    myPipeline.sphere_vesicles()
-    myPipeline.visualization_old_new()
-    myPipeline.making_pyto_stuff()
+    myPipeline.label_convexer() #BZ cleaned up (not it does not run pacman killer)
+    myPipeline.interactive_cleaner() #BZ cleaned up
+    myPipeline.sphere_vesicles() #BZ cleaned up
+    myPipeline.visualization_old_new() #BZ cleaned up
+    myPipeline.making_pyto_stuff() #BZ cleaned up
 
 
 

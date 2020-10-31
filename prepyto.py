@@ -17,22 +17,30 @@ from tqdm import tqdm
 
 
 
-def min_volume_of_vesicle(path_to_file):
+def min_volume_of_vesicle(path_to_file, radius_thr = 12):
+    """
+    :param path_to_file:  path to tomogram
+    :param radius_thr: minimum radius of vesicle in nanometer
+    :return: minimum volume of vesicle in voxels
+    """
     # read voxel size of tomogram
     with mrcfile.open(path_to_file) as tomo:
         voxel_size = float(tomo.voxel_size.x)
         # print(voxel_size)
-    radius_thr = 12
     volume_of_vesicle = (4.0 / 3.0) * np.pi * (radius_thr / voxel_size * 10) ** 3
     return volume_of_vesicle
 
 
-def save_label_to_mrc(labels,path_to_file,folder_to_save,suffix):
-
-    print(os.path.normpath(folder_to_save) + '/' + os.path.splitext(os.path.split(path_to_file)[1])[0] + suffix+'.mrc')
-    with mrcfile.new(os.path.normpath(folder_to_save) + '/' + os.path.splitext(os.path.split(path_to_file)[1])[0] + suffix+'.mrc', overwrite=True) as mrc:
+def save_label_to_mrc(labels,path_to_file):
+    """
+    using pathlib.Path, there is no need to do these complicated string operations
+    hence BZ changed input parameters to only labels and output path.
+    :param labels:
+    :param path_to_file:
+    """
+    with mrcfile.new(path_to_file, overwrite=True) as mrc:
         mrc.set_data(labels)
-    return os.path.normpath(folder_to_save) + '/' + os.path.splitext(os.path.split(path_to_file)[1])[0] + suffix+'.mrc'
+    return path_to_file
 
 
 
@@ -259,13 +267,20 @@ def adjust_shell_intensity(image_int, image_labels):
     return best_param, best_mask  # , mean_shell
 
 
-# this function give 2 label map OLD and NEW
-# and corrct any thing you want not happend in new one which is not desired and turn it back to old one
-# here we had intersection problem of vesicles after changing theroshold
-# at the end this function OR 2 given input (which is source of some bug = we should bring it to top -> later decion needed in group)
-# but give u larger map as result
+
 
 def oneToOneCorrection(old_label, new_label):
+    """
+    this function give 2 label map OLD and NEW
+    and correct anything you want not happend in new one which is not desired and turn it back to old one
+    here we had intersection problem of vesicles after changing threshold
+    at the end this function OR 2 given input (which is source of some bug =
+    we should bring it to top -> later decision needed in group)
+    but give u larger map as result
+    :param old_label:
+    :param new_label:
+    :return:
+    """
     vesicle_regions = skimage.measure.regionprops_table(old_label, properties=('centroid', 'label', 'bbox'))
     myvesicle_regions = skimage.measure.regionprops_table(new_label, properties=('centroid', 'label', 'bbox'))
     mean_shell_arg = []
@@ -338,41 +353,31 @@ def oneToOneCorrection(old_label, new_label):
 # At the end put the sphere instead of vesicles
 # you can easyly detrmine how dilation of erroies u want aslo
 
-def elipsoid_vesicles(image_label, diOrEr=0):
+def ellipsoid_vesicles(image_label, diOrEr=0):
     '''Optimize the size of each vesicle mask to minimize shell intensity'''
-
     # calculate the properties of the labelled regions
     vesicle_regions = skimage.measure.regionprops_table(image_label, properties=('centroid', 'label', 'bbox'))
-
     corrected_labels = np.zeros(image_label.shape)
     print(np.shape(corrected_labels))
     for i in range(1, len(vesicle_regions['label'])):
-
         # here we can have improvment instead of using center fit them into box!
         all_r = []
         p = int(round((vesicle_regions['bbox-3'][i] - vesicle_regions['bbox-0'][i]) / 2))
         q = int(round((vesicle_regions['bbox-4'][i] - vesicle_regions['bbox-1'][i]) / 2))
         r = int(round((vesicle_regions['bbox-5'][i] - vesicle_regions['bbox-2'][i]) / 2))
-
         radius = np.max([p, q, r]) + diOrEr
         all_r += radius
-        #         print(p,q,r)
-
-
-        #         print(np.shape(sub_int_im))
-
+        #TODO what is the purpose of all_r? It seems that it always is an empty list
         sub_label = image_label[vesicle_regions['centroid-0'][i] - radius:vesicle_regions['centroid-0'][i] + radius + 1,
                     vesicle_regions['centroid-1'][i] - radius:vesicle_regions['centroid-1'][i] + radius + 1,
                     vesicle_regions['centroid-2'][i] - radius:vesicle_regions['centroid-2'][i] + radius + 1]
         sub_label = sub_label == vesicle_regions['label'][i]
-
         image_label_opt = skimage.morphology.ball(radius)
         #         fig = plt.figure()
         #         ax = fig.gca(projection='3d')
         #         voxels=image_label_opt
         #         ax.voxels(voxels, edgecolor='k')
         #         break
-
         # complete the full image with that sub-image
         if (vesicle_regions['centroid-0'][i] + radius < np.shape(image_label)[0]) and (
                 vesicle_regions['centroid-1'][i] + radius < np.shape(image_label)[1]) and (
