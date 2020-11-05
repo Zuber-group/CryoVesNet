@@ -1,7 +1,7 @@
 import numpy as np
 
 
-class confusionMatrix:
+class ConfusionMatrix:
     def __init__(self, prediction, reference):
         self.tp = np.sum(np.logical_and(prediction == 1, reference == 1))
         self.tn = np.sum(np.logical_and(prediction == 0, reference == 0))

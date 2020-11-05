@@ -21,7 +21,7 @@ import evaluation
 
 
 
-class pipeline():
+class Pipeline():
 
     def __init__(self,path_to_folder):
 
@@ -212,7 +212,7 @@ class pipeline():
         mask = maskfile.data
         print(np.shape(mask))
         mask = mask >= 10
-        evaluator=evaluation.confusionMatrix(self.corrected_labels>0 , mask)
+        evaluator=evaluation.ConfusionMatrix(self.corrected_labels>0 , mask)
         print(evaluator)
         visualization.viz_labels(self.real_image, [mask, self.corrected_labels], ['grand truth', 'New'])
 
@@ -404,7 +404,7 @@ if __name__ == '__main__':
     choice = input()
     working_datset_index=datasetname_lst.index(choice)
     # print(working_datset_index)
-    myPipeline=pipeline(datasetname_lst[working_datset_index])
+    myPipeline=Pipeline(datasetname_lst[working_datset_index])
     # for dataset in dataset_lst:
     #     pipeline(dataset)
 
