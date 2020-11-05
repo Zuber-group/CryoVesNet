@@ -16,6 +16,7 @@ from tqdm import tqdm
 from multiprocessing.dummy import Pool as ThreadPool
 from pathlib import Path
 import complete_vesicle_segmentation
+import evaluation
 
 
 
@@ -69,6 +70,7 @@ class pipeline():
         mask_name = [str(x) for x in mask_path][0]
 
         self.mask_image = skimage.io.imread(mask_name)
+
         # cleannmask_image = skimage.io.imread(image_dir + '/deep/Dummy_133_clean_mask.tiff')
         os.chdir('../..')
         os.chdir(self.path_to_folder)
@@ -157,7 +159,7 @@ class pipeline():
             0] + '_overall_ourcorrected_labels.mrc'
         myimage_labels = mrcfile.open(mylabel_path).data.astype(np.uint16)
         self.corrected_labels=myimage_labels
-        # self.corrected_labels = prepyto.fast_pacman_killer(myimage_labels)
+        self.corrected_labels = prepyto.fast_pacman_killer(myimage_labels)
 
         # prepyto.save_label_to_tiff(corrected_labels, path_to_file, folder_to_save, suffix='_intensity_corrected_labels')
         prepyto.save_label_to_mrc(self.corrected_labels, self.path_to_file, self.folder_to_save, suffix='_overall_ourcorrected_labels')
@@ -202,6 +204,21 @@ class pipeline():
         # TODO: this method is better to get some argument instead of static argument and show them in nappari
         print("PIPELINE: visualization , we are in " + os.getcwd())
         visualization.viz_labels(self.real_image, [self.clean_labels, self.corrected_labels], ['Old', 'New'])
+
+
+
+    def evaluation(self):
+        maskfile = mrcfile.open('./labels-16bit.mrc')
+        mask = maskfile.data
+        print(np.shape(mask))
+        mask = mask >= 10
+        evaluator=evaluation.confusionMatrix(self.corrected_labels>0 , mask)
+        print(evaluator)
+        visualization.viz_labels(self.real_image, [mask, self.corrected_labels], ['grand truth', 'New'])
+
+        print("The accuracy is: "+ str(evaluator.accuracy()))
+        print("The Dice Metric: "+ str(evaluator.dice_metric()))
+
 
 
     def making_pyto_stuff(self):
@@ -395,13 +412,14 @@ if __name__ == '__main__':
     myPipeline.run_deep()
     myPipeline.setup_prepyto_dir()
     myPipeline.zoom()
-    myPipeline.outcell_remover()
-    # myPipeline.thereshold_tunner()
+    # myPipeline.outcell_remover()
+    myPipeline.thereshold_tunner()
     myPipeline.label_convexer()
     myPipeline.interactive_cleaner()
     myPipeline.sphere_vesicles()
     myPipeline.visualization_old_new()
-    myPipeline.making_pyto_stuff()
+    myPipeline.evaluation()
+    # myPipeline.making_pyto_stuff()
 
 
 
