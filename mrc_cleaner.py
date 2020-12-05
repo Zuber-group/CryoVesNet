@@ -3,7 +3,7 @@ import numpy as np
 import napari
 import mrcfile
 import os
-import unetmic.interactive
+from unetmic.unetmic import interactive
 import sys
 
 
@@ -43,7 +43,7 @@ def interactive_cleaner(real_image,myimage_labels):
         view.add_image(real_image)
         # labels_layer = view.add_labels(myimage_labels , name='Fine')
         labels_layer = view.add_labels(myimage_labels)
-        labels_layer.mouse_drag_callbacks=[unetmic.interactive.get_label]
+        labels_layer.mouse_drag_callbacks=[interactive.get_label]
         # temp=view.layers[1].data
     yesOrNo=query_yes_no("Are you Done with interactive cleaning?")
     return myimage_labels
@@ -59,12 +59,11 @@ def mrc_header_cleaner(source_mrc_path,template_mrc_path, target_mrc_path):
     :param target_mrc_path: (path) the cleaned mrc file path
     :return:
     """
-    #TODO use pathlib.paths to make it more readable
     #firstPart = os.path.split(source_mrc)[0] + '/'
     #name_of_the_file = os.path.splitext(os.path.split(source_mrc)[1])[0]+'_clean.mrc'
     new_target_labels = mrcfile.open(source_mrc_path).data.astype(np.uint16)
     with mrcfile.new(target_mrc_path, overwrite=True) as mrc:
-        tomo = mrcfile.open(template_mrc_path)
+        tomo = mrcfile.open(template_mrc_path, header_only=True)
         mrc.set_data(new_target_labels)
         mrc.voxel_size = tomo.voxel_size
         mrc.header['origin'] = tomo.header['origin']

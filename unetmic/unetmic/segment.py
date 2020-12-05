@@ -7,6 +7,8 @@ import skimage.io
 import pandas as pd
 import mrcfile
 
+from tqdm import tqdm
+
 from . import unetmic as umic
 from . import segment as segment
 
@@ -14,7 +16,7 @@ def find_threshold(image, image_mask):
     
     #first, calculate shell-intensity at different thresholds
     shell_pixels = []
-    for th in np.arange(0.8, 1, 0.01):
+    for th in tqdm(np.arange(0.8, 1, 0.01), desc='finding global threshold on unet mask'):
         image_mask_bin = np.zeros(image_mask.shape)
         image_mask_bin[image_mask>th] = 1
 
@@ -30,19 +32,27 @@ def find_threshold(image, image_mask):
     return opt_th, mean_shell_val
 
 
-def mask_clean_up(image_label):
-    measures = skimage.measure.regionprops_table(image_label, properties=('filled_area','label','extent'))
+def mask_clean_up(image_label, background = 0):
+    """
+    cleans image_label. sets the removed labels to background. Reorder labels not to introduce gaps in indices.
+    :param image_label: array that contains the labels
+    :param background: value to which the excluded labels are set.
+    :return: cleaned label array
+    """
+    #BZ removed from properties "filled_area" which was not used.
+    measures = skimage.measure.regionprops_table(image_label, properties=('label','extent'))
     measures_pd = pd.DataFrame(measures)
     #select objects by extent
+    all_labels = measures_pd.label.values
     sel_labels = measures_pd[(measures_pd.extent>0.3)&(measures_pd.extent<0.7)].label.values
-    #use array indexing to only keep "good" objects"
-    indices = np.array([i if i in sel_labels else 0 for i in np.arange(measures_pd.label.max()+1)])
-    image_label_clean = indices[image_label]
-    #relabel
-    clean_mask = image_label_clean>0
-    clean_labels = skimage.morphology.label(clean_mask)
-    
-    return clean_mask, clean_labels
+    unselected_labels = sorted(set(all_labels) - set(sel_labels))
+    #BZ made the next lines and loop for reordering labels in a more efficient way
+    selection_mask = np.isin(image_label, sel_labels, invert=True)
+    image_label[selection_mask] = background
+    for l in tqdm(unselected_labels[::-1], desc='reorganizing labels after label clean up'):
+        image_label = np.where(image_label > l, image_label - 1, image_label)
+    clean_mask = image_label > background
+    return clean_mask, image_label
 
 def full_segmentation(network_size, unet_weigth_path, path_to_file, folder_to_save, rescale = 1, gauss = False):
     #load the network and weights

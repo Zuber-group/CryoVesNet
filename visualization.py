@@ -1,9 +1,6 @@
-import skimage
-import numpy as np
+
 import napari
-import mrcfile
-import os
-import unetmic.interactive
+
 
 
 def viz_labels(image,list_of_labels,list_of_names):
