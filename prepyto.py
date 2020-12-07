@@ -480,17 +480,17 @@ def main():
                 break
         print(error_str)
     myPipeline = pipeline.Pipeline(dataset_lst[int(choice)])
-    #myPipeline.setup_prepyto_dir()
-    #myPipeline.run_deep()
-    #myPipeline.zoom()
+    myPipeline.setup_prepyto_dir()
+    myPipeline.run_deep()
+    myPipeline.zoom()
     myPipeline.label_vesicles()
-    #myPipeline.threshold_tuner()
-    #myPipeline.label_convexer()
-    #myPipeline.sphere_vesicles()
-    #myPipeline.remove_small_labels()
-    #myPipeline.make_full_modfile()
-    #myPipeline.make_full_label_file()
-    #myPipeline.initialize_pyto()
+    myPipeline.threshold_tuner()
+    myPipeline.label_convexer()
+    myPipeline.sphere_vesicles()
+    myPipeline.remove_small_labels()
+    myPipeline.make_full_modfile()
+    myPipeline.make_full_label_file()
+    myPipeline.initialize_pyto()
 
 
 # Press the green button in the gutter to run the script.
