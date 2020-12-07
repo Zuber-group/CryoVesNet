@@ -1,0 +1,11 @@
+numpy
+scikit-image
+scipy
+jupyter
+jupyterlab
+pandas
+h5py
+tifffile
+mrcfile
+tqdm
+napari
