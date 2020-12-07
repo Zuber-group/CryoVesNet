@@ -201,7 +201,7 @@ class Pipeline():
         config.gpu_options.allow_growth = False
         tf.keras.backend.set_session(tf.Session(config=config))
         network_size = 64
-        segseg.full_segmentation(network_size, self.unet_weight_path, self.image_path,
+        segseg.full_segmentation(network_size, str(self.unet_weight_path.absolute()), self.image_path,
                                   self.deep_dir, rescale=0.5, gauss=True)
 
     def setup_prepyto_dir(self, make_masks = True, memkill = True):
