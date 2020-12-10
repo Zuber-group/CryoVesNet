@@ -1,9 +1,7 @@
-import skimage
 import numpy as np
 import napari
 import mrcfile
-import os
-import unetmic.unetmic.interactive as interactive
+from prepyto import unetmic as interactive
 import sys
 
 

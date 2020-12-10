@@ -9,7 +9,7 @@ import os
 import mrcfile
 from scipy import ndimage
 from tqdm import tqdm
-import pipeline
+from . import pipeline
 from pathlib import Path
 
 
@@ -479,7 +479,13 @@ def main():
             if int(choice) in range(len(dataset_lst)):
                 break
         print(error_str)
-    myPipeline = pipeline.Pipeline(dataset_lst[int(choice)])
+    dataset_dir = dataset_lst[int(choice)]
+    run_default_pipeline(dataset_dir)
+
+
+def run_default_pipeline(dataset_dir):
+    dataset_dir = Path(dataset_dir)
+    myPipeline = pipeline.Pipeline(dataset_dir)
     myPipeline.setup_prepyto_dir()
     myPipeline.run_deep()
     myPipeline.zoom()
