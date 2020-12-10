@@ -1,10 +1,10 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='prepyto',
     version='0.1.1',
     url='',
-    packages=[".", 'unetmic', 'unetmic.unetmic', 'weights','pyto_scripts',],
+    packages=find_packages(),
     license='',
     author='Amin Khosrozadeh',
     author_email='',

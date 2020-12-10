@@ -3,20 +3,20 @@ import platform
 import sys
 from pathlib import Path
 import shutil
-import warnings
+
 try:
     import importlib.resources as pkg_resources
 except ImportError:
     # Try backported to PY<37 `importlib_resources`.
     import importlib_resources as pkg_resources
 import skimage
-import prepyto
-import weights
-import pyto_scripts
-import mrc_cleaner
-import visualization
+from . import prepyto
+from . import pyto_scripts
+from .unetmic.unetmic import segment as segseg
+from . import weights
+from . import mrc_cleaner
+from . import visualization
 import numpy as np
-import unetmic.unetmic.segment as segseg
 import mrcfile
 from tqdm import tqdm
 from collections.abc import Iterable

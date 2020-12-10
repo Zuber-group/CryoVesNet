@@ -81,8 +81,8 @@ def create_unet_3d(inputsize = (32,32,32,1)):
     input = Input(inputsize, name = "input")
     
     unet = blocks.unet_block(n_depth, n_filter_base, kernel_size,
-                      activation=activation, dropout=dropout, batch_norm=batch_norm,
-                      n_conv_per_depth=n_conv_per_depth, pool=pool_size)(input)
+                             activation=activation, dropout=dropout, batch_norm=batch_norm,
+                             n_conv_per_depth=n_conv_per_depth, pool=pool_size)(input)
     
     final = Conv3D(n_channel_out, (1,)*n_dim, activation='sigmoid')(unet)
     
