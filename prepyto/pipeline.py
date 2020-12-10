@@ -464,3 +464,42 @@ class Pipeline():
         if memkill:
             self.clear_memory()
         print(f"saved labels to {self.full_labels_path.relative_to(Path.cwd())}")
+
+    def ask_reference_path(self, file_extension=('mrc', 'nad', 'rec')):
+        dataset_lst = [e for e in self.dir.iterdir()]
+        for i, p in enumerate(dataset_lst):
+            print(f"{i}: {p.name}")
+        while True:
+            choice = input("Which mrc do you want to use as a reference for evaluation (give the number) ?")
+            if choice.isdigit():
+                if int(choice) in range(len(dataset_lst)):
+                    p = Path(dataset_lst[int(choice)])
+                    print(p)
+                    if p.exists() and p.suffix in file_extension:
+                        break
+            print("invalid answer, retry!")
+        return p
+
+    def evaluation(self, reference_path, prediction_path=None):
+        if prediction_path:
+            prediction = mrcfile.open(prediction_path).data
+        else:
+            prediction = self.last_output_array
+        reference = mrcfile.open(reference_path).data
+        #maskfile = mrcfile.open('./compare/labels_manual.mrc')
+        #corrected = mrcfile.open('./compare/labels_automation.mrc')
+        real_image = umic.load_raw('./compare/Dummy_80.rec.nad')
+
+        mask = maskfile.data
+        print(np.shape(mask))
+        mask = mask >= 10
+        corrected_labels = corrected.data
+        corrected_labels = corrected_labels >= 10
+        evaluator = ConfusionMatrix(corrected_labels, mask)
+        print(evaluator)
+
+        print("The Pixel Accuracy is: " + str(evaluator.accuracy()))
+        print("The  Intersection-Over-Union is: " + str(evaluator.jaccard_index()))
+        print("The Dice Metric: " + str(evaluator.dice_metric()))
+
+        visualization.viz_labels(real_image, [mask, corrected_labels], ['grand truth', 'New'])
