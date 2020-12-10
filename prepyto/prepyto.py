@@ -9,7 +9,7 @@ import os
 import mrcfile
 from scipy import ndimage
 from tqdm import tqdm
-from . import pipeline
+import pipeline
 from pathlib import Path
 
 
@@ -462,6 +462,7 @@ def get_label_radii(bbox):
 
 def main():
     base_dir = Path().absolute()
+    base_dir = base_dir / 'data'
     dataset_lst = [e for e in base_dir.iterdir() if e.is_dir()]
     error_str = f"Error: please chose a number between 0 and and {len(dataset_lst) - 1}, or q"
     while True:
@@ -487,16 +488,17 @@ def run_default_pipeline(dataset_dir):
     dataset_dir = Path(dataset_dir)
     myPipeline = pipeline.Pipeline(dataset_dir)
     myPipeline.setup_prepyto_dir()
-    myPipeline.run_deep()
-    myPipeline.zoom()
-    myPipeline.label_vesicles()
-    myPipeline.threshold_tuner()
-    myPipeline.label_convexer()
-    myPipeline.sphere_vesicles()
-    myPipeline.remove_small_labels()
-    myPipeline.make_full_modfile()
-    myPipeline.make_full_label_file()
-    myPipeline.initialize_pyto()
+    myPipeline.evaluation()
+    # myPipeline.run_deep()
+    # myPipeline.zoom()
+    # myPipeline.label_vesicles()
+    # myPipeline.threshold_tuner()
+    # myPipeline.label_convexer()
+    # myPipeline.sphere_vesicles()
+    # myPipeline.remove_small_labels()
+    # myPipeline.make_full_modfile()
+    # myPipeline.make_full_label_file()
+    # myPipeline.initialize_pyto()
 
 
 # Press the green button in the gutter to run the script.

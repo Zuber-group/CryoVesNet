@@ -1,8 +1,9 @@
 import numpy as np
 import napari
 import mrcfile
-from prepyto import unetmic as interactive
+import unetmic as interactive
 import sys
+from pathlib import Path
 
 
 
@@ -66,3 +67,20 @@ def mrc_header_cleaner(source_mrc_path,template_mrc_path, target_mrc_path):
         mrc.voxel_size = tomo.voxel_size
         mrc.header['origin'] = tomo.header['origin']
     return
+
+
+
+def ask_file_path(mypath,file_extension=('.mrc', '.nad', '.rec')):
+    dataset_lst = [e for e in mypath.iterdir()]
+    for i, p in enumerate(dataset_lst):
+        print(f"{i}: {p.name}")
+    while True:
+        choice = input("Which mrc do you want to use as a reference for evaluation (give the number) ?")
+        if choice.isdigit():
+            if int(choice) in range(len(dataset_lst)):
+                p = Path(dataset_lst[int(choice)])
+                print(p)
+                if p.exists() and p.suffix in file_extension:
+                    break
+        print("invalid answer, retry!")
+    return p
