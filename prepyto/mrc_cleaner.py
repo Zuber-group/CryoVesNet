@@ -1,7 +1,7 @@
 import numpy as np
 import napari
 import mrcfile
-import unetmic as interactive
+from .unetmic.unetmic import interactive
 import sys
 from pathlib import Path
 

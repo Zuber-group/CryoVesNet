@@ -9,7 +9,7 @@ import os
 import mrcfile
 from scipy import ndimage
 from tqdm import tqdm
-import pipeline
+from . import pipeline
 from pathlib import Path
 
 

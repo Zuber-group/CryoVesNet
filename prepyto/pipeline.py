@@ -11,12 +11,12 @@ except ImportError:
     import importlib_resources as pkg_resources
 import skimage
 import prepyto
-import pyto_scripts
-from unetmic import segment as segseg
-import weights
-import evaluation_class
-import mrc_cleaner
-import visualization
+from . import pyto_scripts
+from .unetmic.unetmic import segment as segseg
+from . import weights
+#import evaluation_class
+from . import mrc_cleaner
+from . import visualization
 import numpy as np
 import mrcfile
 from tqdm import tqdm
