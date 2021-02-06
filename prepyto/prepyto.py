@@ -8,7 +8,8 @@ import numpy as np
 import pandas as pd
 import os
 import mrcfile
-from scipy import ndimage, stats
+from scipy import ndimage
+from scipy.spatial.distance import mahalanobis
 from tqdm import tqdm
 from . import pipeline
 from pathlib import Path
@@ -320,31 +321,7 @@ def oneToOneCorrection(old_label, new_label, delta_size=3):
     best_corrected_labels = best_corrected_labels.astype(np.uint16)
     return best_corrected_labels
 
-
-def make_vesicles_spherical(image_label, diOrEr=0):
-    corrected_labels = np.zeros(image_label.shape, dtype=int)
-    image_bounding_box = get_image_bounding_box(image_label)
-    vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(image_label,
-                                                                     properties=('centroid', 'label', 'bbox')))
-    bboxes = get_bboxes_from_regions(vesicle_regions)
-    centroids = get_centroids_from_regions(vesicle_regions)
-    labels = get_labels_from_regions(vesicle_regions)
-    for i in range(len(vesicle_regions)):
-        radius = get_label_largest_radius(bboxes[i] , diOrEr) #this is an integer
-        rounded_centroid = np.round(centroids[i]).astype(np.int) #this is an array of integers
-        label = labels[i]
-        label_box = extract_box_of_radius(image_label, rounded_centroid, radius)
-        if is_label_enclosed_in_image(image_bounding_box, rounded_centroid, radius):
-            corrected_labels = put_spherical_label_in_array(corrected_labels, rounded_centroid, radius, label)
-        else:
-            corrected_labels = put_original_label_in_array(corrected_labels, label_box, label, rounded_centroid, radius)
-    corrected_labels = skimage.morphology.label(corrected_labels >= 1, connectivity=1)
-    corrected_labels = corrected_labels.astype(np.uint16)
-    corrected_labels = oneToOneCorrection(image_label, corrected_labels)
-    return corrected_labels
-
-def get_sphere_dataframe(image, image_label, diOrEr=0, margin=5,
-                                                              min_initial_radius = 0):
+def get_sphere_dataframe(image, image_label, margin=5):
     corrected_labels = np.zeros(image_label.shape, dtype=int)
     image_bounding_box = get_image_bounding_box(image_label)
     vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(image_label,
@@ -355,8 +332,7 @@ def get_sphere_dataframe(image, image_label, diOrEr=0, margin=5,
     thicknesses, densities, radii, centers, kept_labels = [],[],[],[],[]
     for i in tqdm(range(len(vesicle_regions)), desc="fitting sphere to vesicles"):
         keep_label = True
-        radius = get_label_largest_radius(bboxes[i] , diOrEr) #this is an integer
-        radius = round(max(min_initial_radius*1.25, radius))
+        radius = get_label_largest_radius(bboxes[i])  #this is an integer
         rounded_centroid = np.round(centroids[i]).astype(np.int) #this is an array of integers
         new_centroid = rounded_centroid.copy()
         label = labels[i]
@@ -394,44 +370,38 @@ def get_sphere_dataframe(image, image_label, diOrEr=0, margin=5,
                           columns=['label','thickness','density','radius','center'])
     df = df.set_index('label')
     return df
-def get_absolute_zscore(array):
-    return np.abs(stats.zscore(array))
+
+def mahalanobis_distances(df, axis=0):
+    '''
+    Returns a pandas Series with Mahalanobis distances for each sample on the
+    axis.
+
+    Note: does not work well when # of observations < # of dimensions
+    Will either return NaN in answer
+    or (in the extreme case) fail with a Singular Matrix LinAlgError
+
+    Args:
+        df: pandas DataFrame with columns to run diagnostics on
+        axis: 0 to find outlier rows, 1 to find outlier columns
+    copyright @ http://github.com/tyarkoni/pliers
+    '''
+    df = df.transpose() if axis == 1 else df
+    means = df.mean()
+    try:
+        inv_cov = np.linalg.inv(df.cov())
+    except LinAlgError:
+        return pd.Series([np.NAN] * len(df.index), df.index,
+                         name='Mahalanobis')
+    dists = []
+    for i, sample in df.iterrows():
+        dists.append(mahalanobis(sample, means, inv_cov))
+
+    return pd.Series(dists, df.index, name='Mahalanobis')
+
 def make_vesicle_from_sphere_dataframe(image_label, sphere_df):
     corrected_labels = np.zeros(image_label.shape, dtype=int)
     for label, row in tqdm(sphere_df.iterrows()):
         corrected_labels = put_spherical_label_in_array(corrected_labels, row.center, row.radius, label)
-    return corrected_labels
-
-def make_vesicles_spherical_v2(image, image_label, diOrEr=0, margin=5):
-    corrected_labels = np.zeros(image_label.shape, dtype=int)
-    image_bounding_box = get_image_bounding_box(image_label)
-    vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(image_label,
-                                                                     properties=('centroid', 'label', 'bbox')))
-    bboxes = get_bboxes_from_regions(vesicle_regions)
-    centroids = get_centroids_from_regions(vesicle_regions)
-    labels = get_labels_from_regions(vesicle_regions)
-    for i in tqdm(range(len(vesicle_regions)), desc="fitting sphere to vesicles"):
-        radius = get_label_largest_radius(bboxes[i] , diOrEr) #this is an integer
-        rounded_centroid = np.round(centroids[i]).astype(np.int) #this is an array of integers
-        label = labels[i]
-        image_box = extract_box_of_radius(image, rounded_centroid, radius+margin)
-        shift = get_optimal_sphere_position(image_box)
-        new_centroid = (rounded_centroid - shift).astype(np.int)
-        new_image_box = extract_box_of_radius(image, new_centroid, radius+margin)
-        try:
-            new_radius = get_optimal_sphere_radius_from_image(new_image_box)
-            radius_found = True
-        except ValueError:
-            print(f"optimal radius could not be found for label {label}. Reverting to old label")
-            radius_found = False
-        if is_label_enclosed_in_image(image_bounding_box, new_centroid, new_radius) and radius_found:
-            corrected_labels = put_spherical_label_in_array(corrected_labels, new_centroid, new_radius, label)
-        else:
-            label_box = extract_box_of_radius(image_label, rounded_centroid, radius)
-            corrected_labels = put_original_label_in_array(corrected_labels, label_box, label, rounded_centroid, radius)
-    corrected_labels = skimage.morphology.label(corrected_labels >= 1, connectivity=1)
-    corrected_labels = corrected_labels.astype(np.uint16)
-    corrected_labels = oneToOneCorrection(image_label, corrected_labels)
     return corrected_labels
 
 def get_labels_from_regions(vesicle_regions):
@@ -552,9 +522,9 @@ def clip_box_to_image_size(image, bbox):
     return clipped_bbox
 
 
-def get_label_largest_radius(bbox, diOrEr):
+def get_label_largest_radius(bbox):
     radii = get_label_radii(bbox)
-    largest_radius = radii.max() + diOrEr
+    largest_radius = radii.max()
     return largest_radius
 
 
@@ -712,7 +682,7 @@ def run_default_pipeline(dataset_dir):
     # myPipeline.label_vesicles()
     # myPipeline.threshold_tuner()
     # myPipeline.label_convexer()
-    # myPipeline.sphere_vesicles()
+    # myPipeline.make_spheres()
     # myPipeline.remove_small_labels()
     # myPipeline.make_full_modfile()
     # myPipeline.make_full_label_file()

@@ -239,7 +239,6 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
-
     def label_vesicles(self, input_array_name='deep_mask', within_segmentation_region = True,
                        memkill=True):
         """label vesicles from the zoomed deep mask
@@ -302,7 +301,6 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
-
     def label_convexer(self, input_array_name='last_output_array_name', memkill=True):
         print("Prepyto Pipeline: making vesicles convex")
         if input_array_name == 'last_output_array_name':
@@ -314,7 +312,6 @@ class Pipeline():
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
-
 
     def interactive_cleaner(self, input_array_name='last_output_array_name', memkill=True):
         """
@@ -334,14 +331,24 @@ class Pipeline():
             self.clear_memory(exclude=self.last_output_array_name)
         self.print_output_info()
 
+    def compute_sphere_dataframe(self, input_array_name='last_output_array_name', memkill=True):
+        if input_array_name == 'last_output_array_name':
+            input_array_name = self.last_output_array_name
+        self.set_array(input_array_name)
+        sphere_df = prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name))
+        mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center'], axis=1))
+        sphere_df['mahalanobis'] = mahalanobis_series
+        self.sphere_df = sphere_df
+        if memkill:
+            self.clear_memory(exclude=[self.last_output_array_name, 'image'])
 
-    def sphere_vesicles(self, input_array_name='last_output_array_name', memkill=True):
+    def make_spheres(self, input_array_name='last_output_array_name', memkill=True):
         print("Prepyto Pipeline: Making vesicles spherical.")
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        #self.sphere_labels = prepyto.make_vesicles_spherical_v(image_label=getattr(self, input_array_name), diOrEr=0)
-        self.sphere_labels = prepyto.make_vesicles_spherical_v2(self.image, getattr(self, input_array_name))
+        self.compute_sphere_dataframe(self.image, getattr(self, input_array_name), memkill=False)
+        self.sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(self.sphere_labels)
         prepyto.save_label_to_mrc(self.sphere_labels, self.sphere_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'sphere_labels'
         if memkill:

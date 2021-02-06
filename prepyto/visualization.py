@@ -25,7 +25,6 @@ def add_points_remove_labels(image, labels_to_analyze, additional_labels=None ):
             viewer.add_labels(additional_labels)
         points_to_remove_layer = viewer.add_points(np.empty((0,3)),name="spheres to remove")
         points_to_add_layer = viewer.add_points(np.empty((0,3)), name="spheres to add")
-
     return points_to_remove_layer.data, points_to_add_layer.data
 
 def display_spheres(image, sphere_df):
