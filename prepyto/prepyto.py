@@ -3,11 +3,12 @@ import skimage
 import skimage.io
 import skimage.measure
 import skimage.morphology
+import skimage.registration
 import numpy as np
 import pandas as pd
 import os
 import mrcfile
-from scipy import ndimage
+from scipy import ndimage, stats
 from tqdm import tqdm
 from . import pipeline
 from pathlib import Path
@@ -22,10 +23,21 @@ def min_volume_of_vesicle(path_to_file, radius_thr = 12):
     :return: minimum volume of vesicle in voxels
     """
     # read voxel size of tomogram
-    with mrcfile.open(path_to_file, header_only = True) as tomo:
-        voxel_size = float(tomo.voxel_size.x)
-    volume_of_vesicle = (4.0 / 3.0) * np.pi * (radius_thr / voxel_size * 10) ** 3
+    radius = min_radius_of_vesicle(path_to_file, radius_thr)
+    volume_of_vesicle = (4.0 / 3.0) * np.pi * (radius) ** 3
     return volume_of_vesicle
+
+
+def min_radius_of_vesicle(path_to_file, radius_thr=12):
+    """
+    :param path_to_file: path to tomogram
+    :param radius_thr: minimum radius in nanometer
+    :return: minimum radius in voxel
+    """
+    with mrcfile.open(path_to_file, header_only=True) as tomo:
+        voxel_size = float(tomo.voxel_size.x)
+    radius = 10 * radius_thr / voxel_size
+    return radius
 
 
 def save_label_to_mrc(labels,path_to_file,template_path=None):
@@ -331,6 +343,96 @@ def make_vesicles_spherical(image_label, diOrEr=0):
     corrected_labels = oneToOneCorrection(image_label, corrected_labels)
     return corrected_labels
 
+def get_sphere_dataframe(image, image_label, diOrEr=0, margin=5,
+                                                              min_initial_radius = 0):
+    corrected_labels = np.zeros(image_label.shape, dtype=int)
+    image_bounding_box = get_image_bounding_box(image_label)
+    vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(image_label,
+                                                                     properties=('centroid', 'label', 'bbox')))
+    bboxes = get_bboxes_from_regions(vesicle_regions)
+    centroids = get_centroids_from_regions(vesicle_regions)
+    labels = get_labels_from_regions(vesicle_regions)
+    thicknesses, densities, radii, centers, kept_labels = [],[],[],[],[]
+    for i in tqdm(range(len(vesicle_regions)), desc="fitting sphere to vesicles"):
+        keep_label = True
+        radius = get_label_largest_radius(bboxes[i] , diOrEr) #this is an integer
+        radius = round(max(min_initial_radius*1.25, radius))
+        rounded_centroid = np.round(centroids[i]).astype(np.int) #this is an array of integers
+        new_centroid = rounded_centroid.copy()
+        label = labels[i]
+        image_box = extract_box_of_radius(image, rounded_centroid, radius+margin)
+        need_reextract = True
+        max_shift = 0.75 * np.linalg.norm(image_box.shape)
+        total_shift = np.zeros(3)
+        while need_reextract:
+            shift, need_reextract = get_optimal_sphere_position(image_box)
+            # if need_reextract:
+            #     print(f"need_reextract with label {label}")
+            total_shift = total_shift + shift
+            if np.linalg.norm(total_shift) > max_shift:
+                keep_label = False
+                break
+            new_centroid = (rounded_centroid - total_shift).astype(np.int)
+            image_box = extract_box_of_radius(image, new_centroid, radius + margin)
+        try:
+            thickness, density = get_sphere_membrane_thickness_and_density_from_image(image_box)
+            new_radius = get_optimal_sphere_radius_from_image(image_box)
+            # if thickness < 6:
+            #     print(f"small thickness, label {label}")
+        except ValueError:
+            print(f"failed, label {label}")
+            keep_label = False
+            thickness = np.nan
+            new_radius = np.nan
+        if keep_label:
+            thicknesses.append(thickness)
+            densities.append(density)
+            radii.append(new_radius)
+            centers.append(new_centroid)
+            kept_labels.append(label)
+    df = pd.DataFrame(zip(kept_labels, thicknesses, densities, radii, centers),
+                          columns=['label','thickness','density','radius','center'])
+    df = df.set_index('label')
+    return df
+def get_absolute_zscore(array):
+    return np.abs(stats.zscore(array))
+def make_vesicle_from_sphere_dataframe(image_label, sphere_df):
+    corrected_labels = np.zeros(image_label.shape, dtype=int)
+    for label, row in tqdm(sphere_df.iterrows()):
+        corrected_labels = put_spherical_label_in_array(corrected_labels, row.center, row.radius, label)
+    return corrected_labels
+
+def make_vesicles_spherical_v2(image, image_label, diOrEr=0, margin=5):
+    corrected_labels = np.zeros(image_label.shape, dtype=int)
+    image_bounding_box = get_image_bounding_box(image_label)
+    vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(image_label,
+                                                                     properties=('centroid', 'label', 'bbox')))
+    bboxes = get_bboxes_from_regions(vesicle_regions)
+    centroids = get_centroids_from_regions(vesicle_regions)
+    labels = get_labels_from_regions(vesicle_regions)
+    for i in tqdm(range(len(vesicle_regions)), desc="fitting sphere to vesicles"):
+        radius = get_label_largest_radius(bboxes[i] , diOrEr) #this is an integer
+        rounded_centroid = np.round(centroids[i]).astype(np.int) #this is an array of integers
+        label = labels[i]
+        image_box = extract_box_of_radius(image, rounded_centroid, radius+margin)
+        shift = get_optimal_sphere_position(image_box)
+        new_centroid = (rounded_centroid - shift).astype(np.int)
+        new_image_box = extract_box_of_radius(image, new_centroid, radius+margin)
+        try:
+            new_radius = get_optimal_sphere_radius_from_image(new_image_box)
+            radius_found = True
+        except ValueError:
+            print(f"optimal radius could not be found for label {label}. Reverting to old label")
+            radius_found = False
+        if is_label_enclosed_in_image(image_bounding_box, new_centroid, new_radius) and radius_found:
+            corrected_labels = put_spherical_label_in_array(corrected_labels, new_centroid, new_radius, label)
+        else:
+            label_box = extract_box_of_radius(image_label, rounded_centroid, radius)
+            corrected_labels = put_original_label_in_array(corrected_labels, label_box, label, rounded_centroid, radius)
+    corrected_labels = skimage.morphology.label(corrected_labels >= 1, connectivity=1)
+    corrected_labels = corrected_labels.astype(np.uint16)
+    corrected_labels = oneToOneCorrection(image_label, corrected_labels)
+    return corrected_labels
 
 def get_labels_from_regions(vesicle_regions):
     labels = np.array(vesicle_regions['label'])
@@ -360,18 +462,21 @@ def get_bboxes_from_regions(vesicle_regions):
     return bboxes
 
 
-def put_spherical_label_in_array(array, rounded_centroid, radius, label):
+def put_spherical_label_in_array(array, rounded_centroid, radius, label, inplace = False):
     sphere = skimage.morphology.ball(radius)
+    if not inplace:
+        array = array.copy()
     px, py, pz = np.where(sphere)
     array[px + rounded_centroid[0] - radius,
           py + rounded_centroid[1] - radius,
           pz + rounded_centroid[2] - radius] = label
     return array
 
-
-def put_original_label_in_array(array, label_box, label, rounded_centroid, radius):
+def put_original_label_in_array(array, label_box, label, rounded_centroid, radius, inplace = False):
     label_mask = label_box == label
     px, py, pz = np.where(label_mask)
+    if not inplace:
+        array = array.copy()
     array[px + rounded_centroid[0] - radius,
           py + rounded_centroid[1] - radius,
           pz + rounded_centroid[2] - radius] = label
@@ -459,7 +564,6 @@ def get_label_radii(bbox):
     radii = radii.astype(int)
     return radii
 
-
 def main():
     base_dir = Path().absolute()
     base_dir = base_dir / 'data'
@@ -483,6 +587,120 @@ def main():
     dataset_dir = dataset_lst[int(choice)]
     run_default_pipeline(dataset_dir)
 
+def embed_array_in_array(small_array, large_array, start_coordinates=(0,0,0)):
+    large_array = large_array.copy()
+    s0,s1,s2 = small_array.shape
+    i,j,k = start_coordinates
+    large_array[i:i+s0,j:j+s1,k:k+s2] = small_array
+    return large_array
+
+def embed_array_in_array_centered(small_array, large_array):
+    start_coordinates = ((np.array(large_array.shape) - np.array(small_array.shape))//2).astype(int)
+    return embed_array_in_array(small_array, large_array, start_coordinates=start_coordinates)
+
+def get_radial_profile(image, origin=None):
+    """get radial profile. If origin is None, then origin is set to
+    the center of the image
+    """
+    if origin is None:
+        origin = np.array(image.shape)//2
+    z, y, x = np.indices((image.shape))
+    r = np.sqrt((x - origin[0])**2 + (y - origin[1])**2 + (z - origin[2])**2)
+    r = r.astype(np.int)
+    tbin = np.bincount(r.ravel(), image.ravel())
+    nr = np.bincount(r.ravel())
+    radial_profile = tbin / nr
+    return radial_profile
+
+def get_3d_radial_average_from_profile(radial_profile,image_shape):
+    #we do not need to care about what the origin of the radial profile was.
+    #we always want the 3d radial average to have its origin centered. and we
+    #want it to have the same image shape as the image that gave rise to the
+    #radial profile.
+    a, b, c = [s//2 for s in image_shape]
+    z, y, x = np.mgrid[-a:a, -b:b, -c:c]
+    rback = np.sqrt(x ** 2 + y ** 2 + z ** 2).astype(np.int)
+    radial_average_3d = radial_profile[rback]
+    return radial_average_3d
+
+def get_3d_radial_average(image,origin=None):
+    """
+    get 3d radial average from image
+    :param image: image to average
+    :param origin: origin for rotational average. if None, then it will be set to the center of the image.
+    :return: rotationally averaged image
+    """
+    radial_profile = get_radial_profile(image, origin)
+    radial_average_3d = get_3d_radial_average_from_profile(radial_profile,image.shape)
+    return radial_average_3d
+
+def get_optimal_sphere_radius_from_radial_profile(radial_profile):
+    """
+    get the radius that includes all the membrane density
+    """
+    i_membrane_center, _ = get_sphere_membrane_center_and_density_from_radial_profile(radial_profile)
+    i_upper_limit = get_radial_profile_i_upper_limit(radial_profile)
+    i_membrane_outer_halo = i_membrane_center + radial_profile[i_membrane_center:i_upper_limit].argmax()
+    derivative2 = np.diff(radial_profile,2)
+    optimal_radius = i_membrane_center + ndimage.gaussian_filter1d(derivative2[i_membrane_center:i_membrane_outer_halo],1).argmin()
+    return(optimal_radius)
+
+
+def get_sphere_membrane_center_and_density_from_radial_profile(radial_profile):
+    i_lower_limit = round(len(radial_profile)*0.1)
+    i_upper_limit = get_radial_profile_i_upper_limit(radial_profile)
+    i_membrane_center = i_lower_limit + radial_profile[i_lower_limit:i_upper_limit].argmin()
+    density = radial_profile[i_membrane_center]
+    return i_membrane_center, density
+
+
+def get_radial_profile_i_upper_limit(radial_profile):
+    length = len(radial_profile)
+    i_upper_limit = round(length * 0.75)
+    return i_upper_limit
+
+
+def get_sphere_membrane_thickness_and_density_from_radial_profile(radial_profile):
+    i_membrane_center, density = get_sphere_membrane_center_and_density_from_radial_profile(radial_profile)
+    sphere_radius = get_optimal_sphere_radius_from_radial_profile(radial_profile)
+    thickness = 2 * (sphere_radius - i_membrane_center)
+    return thickness, density
+
+def get_sphere_membrane_thickness_and_density_from_image(image):
+    radial_profile = get_radial_profile(image)
+    thickness, density = get_sphere_membrane_thickness_and_density_from_radial_profile(radial_profile)
+    return thickness, density
+
+def get_optimal_sphere_radius_from_image(image):
+    radial_profile = get_radial_profile(image)
+    optimal_radius = get_optimal_sphere_radius_from_radial_profile(radial_profile)
+    return optimal_radius
+
+def get_shift_between_images(reference_image, moving_image):
+    shift, _, _ = skimage.registration.phase_cross_correlation(reference_image, moving_image)
+    return shift
+
+def get_shift_of_sphere(image,origin=None):
+    average_image = get_3d_radial_average(image, origin)
+    shift = get_shift_between_images(average_image, image)
+    return shift
+
+def get_optimal_sphere_position(image,max_cycles=10,max_shift_ratio=0.25):
+    need_reextracting = False
+    max_shift = max_shift_ratio * np.linalg.norm(image.shape)
+    total_shift = np.array((0,0,0))
+    shifted_image = image.copy()
+    for i in range(max_cycles):
+        shift = get_shift_of_sphere(shifted_image)
+        total_shift = total_shift + shift
+        if np.linalg.norm(total_shift) > max_shift:
+            need_reextracting = True
+            break
+        #print(f"round {i}, shift is {shift}, total shift is {total_shift}")
+        if np.all(shift == np.zeros(3)):
+            break
+        shifted_image = ndimage.shift(image,total_shift)
+    return total_shift, need_reextracting
 
 def run_default_pipeline(dataset_dir):
     dataset_dir = Path(dataset_dir)

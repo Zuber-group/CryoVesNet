@@ -4,10 +4,13 @@ from tqdm import tqdm
 import skimage.io
 import mrcfile
 
-from tensorflow.keras import backend as K
-from tensorflow.keras.models import Model
-from tensorflow.keras.callbacks import ModelCheckpoint
-from tensorflow.keras.layers import Input, Conv3D
+try:
+    from tensorflow.keras import backend as K
+    from tensorflow.keras.models import Model
+    from tensorflow.keras.callbacks import ModelCheckpoint
+    from tensorflow.keras.layers import Input, Conv3D
+except ModuleNotFoundError:
+    print("unetmic: tensorflow is missing, some function will fail")
 
 #from keras import backend as K
 #from keras.models import Model

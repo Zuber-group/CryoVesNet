@@ -26,7 +26,11 @@ try:
     import tensorflow.compat.v1 as tf
     tf.disable_v2_behavior()
 except ModuleNotFoundError:
-    import tensorflow as tf
+    try:
+        import tensorflow as tf
+    except ModuleNotFoundError:
+        print("pipeline: tensorflow is not installed, some function will not work.")
+
 
 if platform.system() == 'Darwin': os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
@@ -58,6 +62,7 @@ class Pipeline():
         self.mancorr_labels_path = self.save_dir/(self.image_path.stem + '_mancorr.mrc')
         self.sphere_labels_path = self.save_dir/(self.image_path.stem + '_sphere.mrc')
         self.no_small_labels_path = self.save_dir/(self.image_path.stem + '_no_small_labels.mrc')
+        self.centered_radius_adapted_sphere_labels_path = self.save_dir/(self.image_path.stem + '_centered_radius_adapted_labels.mrc')
         self.full_labels_path = self.save_dir/'labels.mrc'
 
         self.image = None #placeholder for real image array
@@ -70,12 +75,13 @@ class Pipeline():
         self.convex_labels = None
         self.mancorr_labels = None
         self.sphere_labels = None
+        self.centered_radius_adapted_sphere_labels = None
         self.no_small_labels = None
         self.full_labels = None
         self.garbage_collector = {'image', 'binned_deep_mask', 'deep_mask', 'cytomask',
                                   'active_zone_mask', 'deep_labels',
                                   'threshold_tuned_labels', 'convex_labels', 'mancorr_labels', 'sphere_labels',
-                                  'no_small_labels'}
+                                  'centered_radius_adapted_sphere_labels', 'no_small_labels'}
         self.vesicle_mod_path = self.dir/'vesicles.mod'
         self.active_zone_mod_path = self.dir/'active_zone.mod'
         self.cell_outline_mod_path = self.dir/'cell_outline.mod'
@@ -84,6 +90,7 @@ class Pipeline():
             self.unet_weight_path = p
         self.check_files()
         self.image_shape = mrcfile.utils.data_shape_from_header(mrcfile.open(self.image_path, header_only=True).header)
+        self.min_radius = prepyto.min_radius_of_vesicle(self.image_path)
         self.min_vol = prepyto.min_volume_of_vesicle(self.image_path)
 
     def set_array(self, array_name, datatype = None):
@@ -333,13 +340,13 @@ class Pipeline():
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        self.sphere_labels = prepyto.make_vesicles_spherical(image_label=getattr(self, input_array_name), diOrEr=0)
+        #self.sphere_labels = prepyto.make_vesicles_spherical_v(image_label=getattr(self, input_array_name), diOrEr=0)
+        self.sphere_labels = prepyto.make_vesicles_spherical_v2(self.image, getattr(self, input_array_name))
         prepyto.save_label_to_mrc(self.sphere_labels, self.sphere_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'sphere_labels'
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
-
 
     def remove_small_labels(self, input_array_name='last_output_array_name', first_label=1, memkill=True):
         """

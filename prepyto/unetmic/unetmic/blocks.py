@@ -1,9 +1,12 @@
 ##from CSBDeep
 
-from tensorflow.keras.layers import Dropout, Activation, BatchNormalization
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Conv3D, MaxPooling3D, UpSampling3D
-#from tensorflow.keras.layers.merge import Concatenate
-from tensorflow.keras.layers import Concatenate
+try:
+    from tensorflow.keras.layers import Dropout, Activation, BatchNormalization
+    from tensorflow.keras.layers import Conv2D, MaxPooling2D, UpSampling2D, Conv3D, MaxPooling3D, UpSampling3D
+    #from tensorflow.keras.layers.merge import Concatenate
+    from tensorflow.keras.layers import Concatenate
+except ModuleNotFoundError:
+    print("blocks: tensorflow not found, some function will fail")
 
 
 def backend_channels_last():
