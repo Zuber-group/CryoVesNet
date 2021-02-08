@@ -181,7 +181,8 @@ class Pipeline():
         path_name = array_name + "_path"
         my_path = getattr(self, path_name)
         print(f"last output array name: {array_name}")
-        print(f"last mrc file saved : {my_path.relative_to(Path.cwd())}")
+        print(f"last mrc file saved : {my_path.relative_to(self.dir)}")
+
 
     def to_list(self, obj):
         if isinstance(obj, Iterable) and (type(obj) != str):
@@ -233,20 +234,24 @@ class Pipeline():
         if memkill:
             self.clear_memory()
 
-    def zoom(self, memkill=True):
+    def zoom(self, force_run=False, memkill=True):
         """
         Zoom the deep mask
         :param memkill:
         :return:
         """
         print("Prepyto Pipeline: zooming the unet mask")
+        self.last_output_array_name = 'deep_mask'
+        if self.deep_mask_path.exists() and not force_run:
+            print("Skipping because a full sized deep mask is already saved on the disk.")
+            print("If you want to force the program to make a new full sized deep mask, set force_run to True.")
+            return
         self.binned_deep_mask = np.load(self.binned_deep_mask_path)
         self.set_array('image')
         self.deep_mask = skimage.transform.resize(self.binned_deep_mask, output_shape=np.shape(self.image),
                                                   preserve_range=True).astype(np.float32)
 
         prepyto.save_label_to_mrc(self.deep_mask, self.deep_mask_path, template_path=self.image_path)
-        self.last_output_array_name = 'deep_mask'
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
