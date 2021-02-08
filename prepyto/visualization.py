@@ -23,9 +23,11 @@ def add_points_remove_labels(image, labels_to_analyze, additional_labels=None ):
         labels_layer = viewer.add_labels(labels_to_analyze)
         if additional_labels is not None:
             viewer.add_labels(additional_labels)
-        points_to_remove_layer = viewer.add_points(np.empty((0,3)),name="spheres to remove")
-        points_to_add_layer = viewer.add_points(np.empty((0,3)), name="spheres to add")
-    return points_to_remove_layer.data, points_to_add_layer.data
+        points_to_remove_layer = viewer.add_points(np.empty((0,3)), n_dimensional=True, name="spheres to remove")
+        points_to_add_layer = viewer.add_points(np.empty((0,3)), size=[], opacity=0.3,
+                                                n_dimensional=True, name="spheres to add")
+    points_to_remove_layer.data
+    return points_to_remove_layer.data, points_to_add_layer.data, points_to_add_layer.size[:,1]
 
 def display_spheres(image, sphere_df):
     with napari.gui_qt():

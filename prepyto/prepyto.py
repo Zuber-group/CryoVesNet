@@ -14,32 +14,19 @@ from tqdm import tqdm
 from . import pipeline
 from pathlib import Path
 
-
-
-
-def min_volume_of_vesicle(path_to_file, radius_thr = 12):
-    """
-    :param path_to_file:  path to tomogram
-    :param radius_thr: minimum radius of vesicle in nanometer
-    :return: minimum volume of vesicle in voxels
-    """
-    # read voxel size of tomogram
-    radius = min_radius_of_vesicle(path_to_file, radius_thr)
-    volume_of_vesicle = (4.0 / 3.0) * np.pi * (radius) ** 3
-    return volume_of_vesicle
-
-
-def min_radius_of_vesicle(path_to_file, radius_thr=12):
-    """
-    :param path_to_file: path to tomogram
-    :param radius_thr: minimum radius in nanometer
-    :return: minimum radius in voxel
-    """
+def get_voxel_size_in_nm(path_to_file):
     with mrcfile.open(path_to_file, header_only=True) as tomo:
-        voxel_size = float(tomo.voxel_size.x)
-    radius = 10 * radius_thr / voxel_size
+        voxel_size = float(tomo.voxel_size.x)/10
+    return voxel_size
+
+def min_radius_of_vesicle(voxel_size, radius_thr=12):
+    radius = radius_thr / voxel_size
     return radius
 
+def min_volume_of_vesicle(voxel_size, radius_thr = 12):
+    radius = min_radius_of_vesicle(voxel_size, radius_thr)
+    volume_of_vesicle = (4.0 / 3.0) * np.pi * (radius) ** 3
+    return volume_of_vesicle
 
 def save_label_to_mrc(labels,path_to_file,template_path=None):
     """
@@ -70,14 +57,10 @@ def decompress_mrc(input, output=None):
             output_mrc.voxel_size = input_mrc.voxel_size
             output_mrc.set_data(input_mrc.data)
 
-
-
 def save_label_to_tiff(labels,path_to_file,folder_to_save,suffix):
     skimage.io.imsave(os.path.normpath(folder_to_save) + '/' + os.path.splitext(os.path.split(path_to_file)[1])[0] + suffix+'.tiff',
                       labels, plugin='tifffile')
     return os.path.normpath(folder_to_save) + '/' + os.path.splitext(os.path.split(path_to_file)[1])[0] + suffix+'.tiff'
-
-
 
 # here we use mask_image (probabilty map) comes from our network
 # for each vesicles we compute theroshold from this map
@@ -176,10 +159,6 @@ def pacman_killer(image_label):
     corrected_labels = corrected_labels.astype(np.uint16)
     return corrected_labels
 
-
-
-
-
 def fast_pacman_killer(image_label):
     vesicle_regions = skimage.measure.regionprops_table(image_label, properties=('label', 'bbox'))
     bboxes = get_bboxes_from_regions(vesicle_regions)
@@ -201,7 +180,6 @@ def fast_pacman_killer(image_label):
     corrected_labels = corrected_labels.astype(np.uint16)
     return corrected_labels
 
-
 def my_threshold(image, image_mask):
     # first, calculate shell-intensity at different thresholds
     shell_pixels = []
@@ -217,23 +195,17 @@ def my_threshold(image, image_mask):
     mean_shell_val = [np.mean(x) for x in shell_pixels]
     # find optimal threshold
     opt_th = np.arange(0.8, 1, 0.01)[np.argmin(mean_shell_val)]
-
     return opt_th, mean_shell_val
-
 
 def adjust_shell_intensity(image_int, image_labels):
     '''For a given sub-region adjust the size the vesicle mask to minimize its average shell intensity'''
-
     mean_shell = []
-
     # calculate the mean shell value in the original segmentation.
     mask_adjusted = image_labels.copy()
     # create a slightly eroded version of the region
     image_mask_bin_erode = skimage.morphology.binary_erosion(mask_adjusted, selem=skimage.morphology.ball(1))
-
     # combine original image and eroded one to keep only the shell
     image_shell = mask_adjusted ^ image_mask_bin_erode
-
     # recover pixels in the shell and calculate their mean intensity
     shell_pixels = image_int[image_shell.astype(bool)]
     mean_shell.append([0, np.mean(shell_pixels)])
@@ -251,9 +223,7 @@ def adjust_shell_intensity(image_int, image_labels):
             best_value = meanval
             best_param = i
             best_mask = mask_adjusted
-
     return best_param, best_mask  # , mean_shell
-
 
 def oneToOneCorrection(old_label, new_label, delta_size=3):
     """
@@ -270,10 +240,8 @@ def oneToOneCorrection(old_label, new_label, delta_size=3):
     vesicle_regions = skimage.measure.regionprops_table(old_label, properties=('centroid', 'label', 'bbox'))
     myvesicle_regions = skimage.measure.regionprops_table(new_label, properties=('centroid', 'label', 'bbox'))
     mean_shell_arg = []
-
     #     corrected_labels = np.zeros(new_label.shape)
     corrected_labels = new_label.copy()
-
     vesicles = []
     for i in range(1, len(vesicle_regions['label'])):
         sub_old_label = old_label[vesicle_regions['bbox-0'][i] - delta_size:vesicle_regions['bbox-3'][i] + delta_size+1,
@@ -284,7 +252,6 @@ def oneToOneCorrection(old_label, new_label, delta_size=3):
         sub_new_label = new_label[vesicle_regions['bbox-0'][i] - delta_size:vesicle_regions['bbox-3'][i] + delta_size + 1,
                         vesicle_regions['bbox-1'][i] - delta_size:vesicle_regions['bbox-4'][i] + delta_size + 1,
                         vesicle_regions['bbox-2'][i] - delta_size:vesicle_regions['bbox-5'][i] + delta_size + 1]
-
         a, b, c = ndimage.measurements.center_of_mass(sub_old_label_mask, vesicle_regions['label'][i])
         if any(np.isnan([a, b, c])):
             vesicles += [0]
@@ -331,35 +298,11 @@ def get_sphere_dataframe(image, image_label, margin=5):
     labels = get_labels_from_regions(vesicle_regions)
     thicknesses, densities, radii, centers, kept_labels = [],[],[],[],[]
     for i in tqdm(range(len(vesicle_regions)), desc="fitting sphere to vesicles"):
-        keep_label = True
         radius = get_label_largest_radius(bboxes[i])  #this is an integer
         rounded_centroid = np.round(centroids[i]).astype(np.int) #this is an array of integers
-        new_centroid = rounded_centroid.copy()
         label = labels[i]
-        image_box = extract_box_of_radius(image, rounded_centroid, radius+margin)
-        need_reextract = True
-        max_shift = 0.75 * np.linalg.norm(image_box.shape)
-        total_shift = np.zeros(3)
-        while need_reextract:
-            shift, need_reextract = get_optimal_sphere_position(image_box)
-            # if need_reextract:
-            #     print(f"need_reextract with label {label}")
-            total_shift = total_shift + shift
-            if np.linalg.norm(total_shift) > max_shift:
-                keep_label = False
-                break
-            new_centroid = (rounded_centroid - total_shift).astype(np.int)
-            image_box = extract_box_of_radius(image, new_centroid, radius + margin)
-        try:
-            thickness, density = get_sphere_membrane_thickness_and_density_from_image(image_box)
-            new_radius = get_optimal_sphere_radius_from_image(image_box)
-            # if thickness < 6:
-            #     print(f"small thickness, label {label}")
-        except ValueError:
-            print(f"failed, label {label}")
-            keep_label = False
-            thickness = np.nan
-            new_radius = np.nan
+        density, keep_label, new_centroid, new_radius, thickness = get_sphere_parameters(image, label, margin, radius,
+                                                                                         rounded_centroid)
         if keep_label:
             thicknesses.append(thickness)
             densities.append(density)
@@ -370,6 +313,36 @@ def get_sphere_dataframe(image, image_label, margin=5):
                           columns=['label','thickness','density','radius','center'])
     df = df.set_index('label')
     return df
+
+
+def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
+    image_box = extract_box_of_radius(image, rounded_centroid, radius + margin)
+    need_reextract = True
+    max_shift = 0.75 * np.linalg.norm(image_box.shape)
+    total_shift = np.zeros(3)
+    while need_reextract:
+        shift, need_reextract = get_optimal_sphere_position(image_box)
+        # if need_reextract:
+        #     print(f"need_reextract with label {label}")
+        total_shift = total_shift + shift
+        if np.linalg.norm(total_shift) > max_shift:
+            keep_label = False
+            break
+        new_centroid = (rounded_centroid - total_shift).astype(np.int)
+        image_box = extract_box_of_radius(image, new_centroid, radius + margin)
+    try:
+        thickness, density = get_sphere_membrane_thickness_and_density_from_image(image_box)
+        new_radius = get_optimal_sphere_radius_from_image(image_box)
+        keep_label = True
+        # if thickness < 6:
+        #     print(f"small thickness, label {label}")
+    except ValueError:
+        print(f"failed, label {label}")
+        keep_label = False
+        thickness = np.nan
+        new_radius = np.nan
+    return density, keep_label, new_centroid, new_radius, thickness
+
 
 def mahalanobis_distances(df, axis=0):
     '''
@@ -395,13 +368,41 @@ def mahalanobis_distances(df, axis=0):
     dists = []
     for i, sample in df.iterrows():
         dists.append(mahalanobis(sample, means, inv_cov))
-
     return pd.Series(dists, df.index, name='Mahalanobis')
 
 def make_vesicle_from_sphere_dataframe(image_label, sphere_df):
     corrected_labels = np.zeros(image_label.shape, dtype=int)
+    sphere_dict = {}
     for label, row in tqdm(sphere_df.iterrows()):
-        corrected_labels = put_spherical_label_in_array(corrected_labels, row.center, row.radius, label)
+        add_sphere_in_dict(sphere_dict, row.radius)
+        put_spherical_label_in_array(corrected_labels, row.center, row.radius, label,inplace=True)
+    return sphere_dict, corrected_labels
+
+def add_sphere_in_dict(sphere_dict, radius):
+    if radius in sphere_dict:
+        return
+    sphere_dict[radius] = skimage.morphology.ball(radius)
+
+def remove_labels_under_points(image_label, points_to_remove):
+    labels_to_remove = np.unique([image_label[a,b,c] for a,b,c in np.round(points_to_remove).astype(int)])
+    selection_mask = np.isin(image_label, labels_to_remove)
+    corrected_labels = image_label.copy()
+    corrected_labels[selection_mask] = 0
+    return corrected_labels
+
+def add_sphere_labels_under_points(image, image_labels, points_to_add,
+                                   points_to_add_sizes, minimum_box_size):
+    corrected_labels = image_labels.copy()
+    max_label = image_labels.max()
+    for i, point in enumerate(points_to_add):
+        rounded_centroid = np.round(point).astype(int)
+        point_size = points_to_add_sizes[i]
+        radius = max(point_size, minimum_box_size)//2
+        label = i + max_label + 1
+        density, keep_label, new_centroid, new_radius, thickness = \
+            get_sphere_parameters(image, label, 5, radius, rounded_centroid)
+        if keep_label:
+            put_spherical_label_in_array(corrected_labels, rounded_centroid, radius, label, inplace = True)
     return corrected_labels
 
 def get_labels_from_regions(vesicle_regions):
@@ -432,15 +433,17 @@ def get_bboxes_from_regions(vesicle_regions):
     return bboxes
 
 
-def put_spherical_label_in_array(array, rounded_centroid, radius, label, inplace = False):
-    sphere = skimage.morphology.ball(radius)
+def put_spherical_label_in_array(array, rounded_centroid, radius, label, inplace = False, sphere=None):
+    if sphere is None:
+        sphere = skimage.morphology.ball(radius)
     if not inplace:
         array = array.copy()
     px, py, pz = np.where(sphere)
     array[px + rounded_centroid[0] - radius,
           py + rounded_centroid[1] - radius,
           pz + rounded_centroid[2] - radius] = label
-    return array
+    if not inplace:
+        return array
 
 def put_original_label_in_array(array, label_box, label, rounded_centroid, radius, inplace = False):
     label_mask = label_box == label
@@ -469,6 +472,8 @@ def is_label_enclosed_in_image(image_bounding_box, rounded_3d_centroid, radius):
 
 def get_bounding_box_from_centroid_and_radius(rounded_3d_centroid, radius):
     bounding_box = np.zeros((3,2), dtype=int)
+    rounded_3d_centroid = np.round(rounded_3d_centroid).astype(int)
+    radius = int(round(radius))
     bounding_box[:,0] = rounded_3d_centroid - radius
     bounding_box[:,1] = rounded_3d_centroid + radius
     return bounding_box

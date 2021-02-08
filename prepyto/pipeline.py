@@ -90,8 +90,14 @@ class Pipeline():
             self.unet_weight_path = p
         self.check_files()
         self.image_shape = mrcfile.utils.data_shape_from_header(mrcfile.open(self.image_path, header_only=True).header)
-        self.min_radius = prepyto.min_radius_of_vesicle(self.image_path)
-        self.min_vol = prepyto.min_volume_of_vesicle(self.image_path)
+        self.voxel_size = prepyto.get_voxel_size_in_nm(self.image_path)
+        self.min_radius = prepyto.min_radius_of_vesicle(self.voxel_size)
+        self.min_vol = prepyto.min_volume_of_vesicle(self.voxel_size)
+
+    def quick_setup(self, labels_to_load=['sphere_labels']):
+        self.set_array('image')
+        for label_name in labels_to_load:
+            self.set_array(label_name)
 
     def set_array(self, array_name, datatype = None):
         """
@@ -347,10 +353,26 @@ class Pipeline():
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        self.compute_sphere_dataframe(self.image, getattr(self, input_array_name), memkill=False)
-        self.sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(self.sphere_labels)
+        self.compute_sphere_dataframe(input_array_name, False)
+        self.sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(self.sphere_labels, self.sphere_df)
         prepyto.save_label_to_mrc(self.sphere_labels, self.sphere_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'sphere_labels'
+        if memkill:
+            self.clear_memory(exclude=[self.last_output_array_name, 'image'])
+        self.print_output_info()
+
+    def fix_spheres_interactively(self, input_array_name='last_output_array_name', memkill=True):
+        if input_array_name == 'last_output_array_name':
+            input_array_name = self.last_output_array_name
+        self.set_array(input_array_name)
+        points_to_remove, points_to_add, points_to_add_sizes = visualization.add_points_remove_labels(self.image,
+                                                                                                      self.sphere_labels)
+        minimum_box_size = self.voxel_size * 50
+        self.mancorr_labels = prepyto.remove_labels_under_points(getattr(self, input_array_name), points_to_remove)
+
+        self.mancorr_labels = prepyto.add_sphere_labels_under_points(self.image,self.manncorr_labels, points_to_add,
+                                                                     points_to_add_sizes, minimum_box_size)
+        self.last_output_array_name = 'mancorr_labels'
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
