@@ -371,12 +371,12 @@ def mahalanobis_distances(df, axis=0):
     return pd.Series(dists, df.index, name='Mahalanobis')
 
 def make_vesicle_from_sphere_dataframe(image_label, sphere_df):
-    corrected_labels = np.zeros(image_label.shape, dtype=int)
+    corrected_labels = np.zeros(np.array(image_label).shape, dtype=np.int16)
     sphere_dict = {}
-    for label, row in tqdm(sphere_df.iterrows()):
+    for label, row in sphere_df.iterrows():
         add_sphere_in_dict(sphere_dict, row.radius)
         put_spherical_label_in_array(corrected_labels, row.center, row.radius, label,inplace=True)
-    return sphere_dict, corrected_labels
+    return corrected_labels
 
 def add_sphere_in_dict(sphere_dict, radius):
     if radius in sphere_dict:

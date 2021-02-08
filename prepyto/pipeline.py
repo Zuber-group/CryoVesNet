@@ -18,6 +18,7 @@ from . import weights
 from . import mrc_cleaner
 from . import visualization
 import numpy as np
+import pandas as pd
 import mrcfile
 from tqdm import tqdm
 from collections.abc import Iterable
@@ -61,6 +62,7 @@ class Pipeline():
         self.convex_labels_path = self.save_dir/(self.image_path.stem + '_convex_labels.mrc')
         self.mancorr_labels_path = self.save_dir/(self.image_path.stem + '_mancorr.mrc')
         self.sphere_labels_path = self.save_dir/(self.image_path.stem + '_sphere.mrc')
+        self.sphere_df_path = self.save_dir/(self.image_path.stem + '_sphere_dataframe.pkl')
         self.no_small_labels_path = self.save_dir/(self.image_path.stem + '_no_small_labels.mrc')
         self.centered_radius_adapted_sphere_labels_path = self.save_dir/(self.image_path.stem + '_centered_radius_adapted_labels.mrc')
         self.full_labels_path = self.save_dir/'labels.mrc'
@@ -93,6 +95,9 @@ class Pipeline():
         self.voxel_size = prepyto.get_voxel_size_in_nm(self.image_path)
         self.min_radius = prepyto.min_radius_of_vesicle(self.voxel_size)
         self.min_vol = prepyto.min_volume_of_vesicle(self.voxel_size)
+
+        if self.sphere_df_path.exists():
+            self.sphere_df = pd.read_pickle(self.sphere_df_path)
 
     def quick_setup(self, labels_to_load=['sphere_labels']):
         self.set_array('image')
@@ -344,6 +349,7 @@ class Pipeline():
         sphere_df = prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name))
         mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center'], axis=1))
         sphere_df['mahalanobis'] = mahalanobis_series
+        sphere_df.to_pickle(self.sphere_df_path)
         self.sphere_df = sphere_df
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
@@ -354,7 +360,7 @@ class Pipeline():
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
         self.compute_sphere_dataframe(input_array_name, False)
-        self.sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(self.sphere_labels, self.sphere_df)
+        self.sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(getattr(self,input_array_name), self.sphere_df)
         prepyto.save_label_to_mrc(self.sphere_labels, self.sphere_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'sphere_labels'
         if memkill:
