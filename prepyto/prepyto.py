@@ -371,7 +371,7 @@ def mahalanobis_distances(df, axis=0):
     return pd.Series(dists, df.index, name='Mahalanobis')
 
 def make_vesicle_from_sphere_dataframe(image_label, sphere_df):
-    corrected_labels = np.zeros(np.array(image_label).shape, dtype=np.int16)
+    corrected_labels = np.zeros(np.array(image_label).shape).astype(np.int16)
     sphere_dict = {}
     for label, row in sphere_df.iterrows():
         add_sphere_in_dict(sphere_dict, row.radius)
@@ -397,12 +397,12 @@ def add_sphere_labels_under_points(image, image_labels, points_to_add,
     for i, point in enumerate(points_to_add):
         rounded_centroid = np.round(point).astype(int)
         point_size = points_to_add_sizes[i]
-        radius = max(point_size, minimum_box_size)//2
+        radius = int(max(point_size, minimum_box_size)//2)
         label = i + max_label + 1
         density, keep_label, new_centroid, new_radius, thickness = \
             get_sphere_parameters(image, label, 5, radius, rounded_centroid)
         if keep_label:
-            put_spherical_label_in_array(corrected_labels, rounded_centroid, radius, label, inplace = True)
+            put_spherical_label_in_array(corrected_labels, new_centroid, new_radius, label, inplace = True)
     return corrected_labels
 
 def get_labels_from_regions(vesicle_regions):

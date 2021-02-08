@@ -96,6 +96,8 @@ class Pipeline():
         self.min_radius = prepyto.min_radius_of_vesicle(self.voxel_size)
         self.min_vol = prepyto.min_volume_of_vesicle(self.voxel_size)
 
+        if self.image_path.exists():
+            self.set_array('image')
         if self.sphere_df_path.exists():
             self.sphere_df = pd.read_pickle(self.sphere_df_path)
 
@@ -173,7 +175,6 @@ class Pipeline():
                 garbage.remove(ex)
         for g in garbage:
             setattr(self, g, None)
-
 
     def print_output_info(self):
         array_name = self.last_output_array_name
@@ -367,18 +368,31 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
+    def identify_spheres_outliers(self, bins=50, min_mahalanobis_distance=2.0):
+        ax = self.sphere_df.mahalanobis.hist(bins=bins, color='blue')
+        ylim0, ylim1 = ax.get_ylim()
+        ax.vlines(min_mahalanobis_distance, ylim0, ylim1, linestyles='dashed', color='red',
+                  label = 'Mahalanobis threshold for printing sphere details')
+        ax.set_title("Outlier spheres detection")
+        ax.set_xlabel("Mahalanobis")
+        ax.set_ylabel("Number of spheres")
+        print(self.sphere_df[self.sphere_df.mahalanobis > min_mahalanobis_distance].sort_values('mahalanobis'))
+        print("You should inspect the labels that have a high mahalanobis distance as they are the likeliest to be wrongly segmented")
+
+
+
     def fix_spheres_interactively(self, input_array_name='last_output_array_name', memkill=True):
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
         points_to_remove, points_to_add, points_to_add_sizes = visualization.add_points_remove_labels(self.image,
-                                                                                                      self.sphere_labels)
+                                                                                                      getattr(self,input_array_name))
         minimum_box_size = self.voxel_size * 50
         self.mancorr_labels = prepyto.remove_labels_under_points(getattr(self, input_array_name), points_to_remove)
-
-        self.mancorr_labels = prepyto.add_sphere_labels_under_points(self.image,self.manncorr_labels, points_to_add,
+        self.mancorr_labels = prepyto.add_sphere_labels_under_points(self.image,self.mancorr_labels, points_to_add,
                                                                      points_to_add_sizes, minimum_box_size)
         self.last_output_array_name = 'mancorr_labels'
+        prepyto.save_label_to_mrc(self.mancorr_labels, self.mancorr_labels_path, template_path=self.image_path)
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
