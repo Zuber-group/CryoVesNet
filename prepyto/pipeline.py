@@ -363,7 +363,7 @@ class Pipeline():
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        self.compute_sphere_dataframe(input_array_name, False)
+        self.compute_sphere_dataframe(input_array_name)
         self.sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(getattr(self,input_array_name), self.sphere_df)
         prepyto.save_label_to_mrc(self.sphere_labels, self.sphere_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'sphere_labels'
