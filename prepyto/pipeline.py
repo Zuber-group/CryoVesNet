@@ -348,7 +348,7 @@ class Pipeline():
             self.clear_memory(exclude=self.last_output_array_name)
         self.print_output_info()
 
-    def compute_sphere_dataframe(self, input_array_name='last_output_array_name', memkill=True):
+    def compute_sphere_dataframe(self, input_array_name='last_output_array_name'):
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
@@ -357,8 +357,6 @@ class Pipeline():
         sphere_df['mahalanobis'] = mahalanobis_series
         sphere_df.to_pickle(self.sphere_df_path)
         self.sphere_df = sphere_df
-        if memkill:
-            self.clear_memory(exclude=[self.last_output_array_name, 'image'])
 
     def make_spheres(self, input_array_name='last_output_array_name', memkill=True):
         print("Prepyto Pipeline: Making vesicles spherical.")
