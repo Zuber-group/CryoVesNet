@@ -677,6 +677,16 @@ def get_optimal_sphere_position(image,max_cycles=10,max_shift_ratio=0.25):
         shifted_image = ndimage.shift(image,total_shift)
     return total_shift, need_reextracting
 
+def rearrange_labels(image_label, dtype=np.int16):
+    """rearrange the labels so that they go from 1 to n labels. Label order is preserved. The goal
+    is to avoid any empty label"""
+    uniques = np.unique(image_label)
+    replace = {v: i for i, v in enumerate(uniques)}
+    lookup_table = np.arange(0,uniques[-1]+1).astype(dtype)
+    lookup_table[[*replace.keys()]] = [*replace.values()]
+    return lookup_table[image_label]
+
+
 def run_default_pipeline(dataset_dir):
     dataset_dir = Path(dataset_dir)
     myPipeline = pipeline.Pipeline(dataset_dir)

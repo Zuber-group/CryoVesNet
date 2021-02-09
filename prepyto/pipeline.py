@@ -64,7 +64,7 @@ class Pipeline():
         self.sphere_labels_path = self.save_dir/(self.image_path.stem + '_sphere.mrc')
         self.sphere_df_path = self.save_dir/(self.image_path.stem + '_sphere_dataframe.pkl')
         self.no_small_labels_path = self.save_dir/(self.image_path.stem + '_no_small_labels.mrc')
-        self.centered_radius_adapted_sphere_labels_path = self.save_dir/(self.image_path.stem + '_centered_radius_adapted_labels.mrc')
+        self.final_vesicle_labels_path = self.save_dir/(self.image_path.stem + '_final_vesicle_labels.mrc')
         self.full_labels_path = self.save_dir/'labels.mrc'
 
         self.image = None #placeholder for real image array
@@ -77,13 +77,13 @@ class Pipeline():
         self.convex_labels = None
         self.mancorr_labels = None
         self.sphere_labels = None
-        self.centered_radius_adapted_sphere_labels = None
         self.no_small_labels = None
+        self.final_vesicle_labels = None
         self.full_labels = None
         self.garbage_collector = {'image', 'binned_deep_mask', 'deep_mask', 'cytomask',
                                   'active_zone_mask', 'deep_labels',
                                   'threshold_tuned_labels', 'convex_labels', 'mancorr_labels', 'sphere_labels',
-                                  'centered_radius_adapted_sphere_labels', 'no_small_labels'}
+                                  'no_small_labels', 'final_vesicle_labels'}
         self.vesicle_mod_path = self.dir/'vesicles.mod'
         self.active_zone_mod_path = self.dir/'active_zone.mod'
         self.cell_outline_mod_path = self.dir/'cell_outline.mod'
@@ -382,8 +382,6 @@ class Pipeline():
         print(self.sphere_df[self.sphere_df.mahalanobis > min_mahalanobis_distance].sort_values('mahalanobis'))
         print("You should inspect the labels that have a high mahalanobis distance as they are the likeliest to be wrongly segmented")
 
-
-
     def fix_spheres_interactively(self, input_array_name='last_output_array_name', memkill=True):
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
@@ -459,21 +457,30 @@ class Pipeline():
         with pkg_resources.path(pyto_scripts, '.') as src:
             shutil.copytree(src, self.pyto_dir)
 
-    def make_full_modfile(self, input_array_name='last_output_array_name', memkill=True ):
+    def make_full_modfile(self, input_array_name='last_output_array_name', do_rearrange_labels=True, memkill=True):
         """
         convert the vesicle label file to a modfile and merge it with the initial modfile
+        do_rearrange_labels: if True, then no empty label in the input labels array are left
         """
         print("Prepyto Pipeline: making full mod file")
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
-        input_array_path = getattr(self, input_array_name + '_path')
-        cmd0 = f"imodauto -f 3 -m 1 -h 0 \"{input_array_path}\" \"{self.full_mod_path}\""
+        self.set_array(input_array_name)
+        if do_rearrange_labels:
+            self.final_vesicle_labels = prepyto.rearrange_labels(getattr(self,input_array_name))
+            print("rearranged labels")
+        else:
+            self.final_vesicle_labels = getattr(self,input_array_name)
+        prepyto.save_label_to_mrc(self.final_vesicle_labels, self.final_vesicle_labels_path, template_path=self.image_path)
+        self.last_output_array_name = 'final_vesicle_labels'
+        self.print_output_info()
+        cmd0 = f"imodauto -f 3 -m 1 -h 0 \"{self.final_vesicle_labels_path}\" \"{self.full_mod_path}\""
         cmd1 = f"imodjoin -c \"{self.cell_outline_mod_path}\" \"{self.active_zone_mod_path}\" \"{self.full_mod_path}\" \"{self.full_mod_path}\""
         os.system(cmd0)
         os.system(cmd1)
         if memkill:
-            self.clear_memory(exclude=[input_array_name, 'image'])
-        print(f"full model file saved to {self.full_mod_path.relative_to(Path.cwd())}")
+            self.clear_memory(exclude=[self.last_output_array_name, 'image'])
+        print(f"full model file saved to {self.full_mod_path.relative_to(self.dir)}")
 
 
     def handpick(self):
@@ -523,7 +530,7 @@ class Pipeline():
         prepyto.save_label_to_mrc(self.full_labels, self.full_labels_path, template_path=self.image_path)
         if memkill:
             self.clear_memory()
-        print(f"saved labels to {self.full_labels_path.relative_to(Path.cwd())}")
+        print(f"saved labels to {self.full_labels_path.relative_to(self.dir)}")
 
 
 
