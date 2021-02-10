@@ -12,6 +12,7 @@ setup(
     package_data={'': ['weights/weights.h5']},
     include_package_data=True,
     install_requires=['numpy', 'scikit-image', 'scipy', 'jupyter','jupyterlab',
-                      'pandas', 'h5py', 'tifffile','mrcfile','tqdm', 'napari'],
+                      'pandas', 'h5py', 'tifffile','mrcfile','tqdm', 'napari',
+                      'keras', 'tensorflow-gpu','cudatoolkit'],
 
 )
