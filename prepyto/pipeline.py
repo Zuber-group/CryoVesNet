@@ -204,7 +204,7 @@ class Pipeline():
             err = f"""the following file(s) and/or directory(s) are missing: {", ".join(missing)}"""
             raise IOError(err)
 
-    def run_deep(self, force_run=False):
+    def run_deep(self, force_run=False, rescale=0.5):
         """
         Merged vesicle_segmentation and run_deep to make it a pipeline method
         all output files are saved in self.deep_dir
@@ -223,7 +223,7 @@ class Pipeline():
         tf.keras.backend.set_session(tf.Session(config=config))
         network_size = 64
         segseg.full_segmentation(network_size, str(self.unet_weight_path.absolute()), self.image_path,
-                                  self.deep_dir, rescale=0.5, gauss=True)
+                                  self.deep_dir, rescale=rescale, gauss=True)
 
     def setup_prepyto_dir(self, make_masks = True, memkill = True):
         print("Prepyto Pipeline: setting up prepyto directory")
