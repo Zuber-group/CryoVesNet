@@ -211,6 +211,10 @@ class Pipeline():
         if erase_existing:
             for p in self.deep_dir.glob("*"):
                 p.unlink()
+        tf.get_logger().setLevel('INFO')
+        import logging
+        logging.getLogger("tensorflow").setLevel(logging.ERROR)
+        logging.getLogger("tensorflow").addHandler(logging.NullHandler(logging.ERROR))
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = False
         tf.keras.backend.set_session(tf.Session(config=config))
@@ -222,15 +226,15 @@ class Pipeline():
         all output files are saved in self.deep_dir
         """
         print("Prepyto pipeline: Running unet segmentation if there are less than 7 file in ./deep directory")
-        self.prepare_deep(erase_exiting=force_run)
+        self.prepare_deep(erase_existing=force_run)
         if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 7 and not force_run:
             return
         segseg.full_segmentation(self.network_size, str(self.unet_weight_path.absolute()), self.image_path,
                                   self.deep_dir, rescale=rescale, gauss=True)
 
     def run_deep_at_multiple_rescale(self, min_rescale=0.1, max_rescale=1, nsteps=10):
-        max_deep_mask = np.zeros_like(self.image, dtype=np.float)
-        deep_winners_mask = np.zeros_like(self.image, dtype=np.float)
+        max_deep_mask = np.zeros_like(self.image, dtype=np.float16)
+        deep_winners_mask = np.zeros_like(self.image, dtype=np.float16)
         for rescale in np.linspace(min_rescale,max_rescale,num=nsteps,endpoint=True):
             print(f"Prepyto pipeline: run_deep_at_multiple_rescale - rescale = {rescale}")
             self.run_deep(force_run=True, rescale=rescale)
