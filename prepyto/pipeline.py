@@ -55,6 +55,7 @@ class Pipeline():
         #there are issues loading a 3D 64-bit tiff --> shape comes incorrect. Therefore we use the np array save on disk
         self.binned_deep_mask_path = self.deep_dir / (self.image_path.stem + '_segUnet.npy')
         self.deep_mask_path = self.save_dir/(self.image_path.stem + '_zoomed_mask.mrc')
+        self.deep_winners_mask_path = self.save_dir/(self.image_path.stem + '_winning_rescale_factors.mrc')
         self.cytomask_path = self.save_dir/(self.image_path.stem + '_cytomask.mrc')
         self.active_zone_mask_path = self.save_dir/(self.image_path.stem + '_azmask.mrc')
         self.deep_labels_path = self.save_dir/(self.image_path.stem + '_deep_labels.mrc')
@@ -70,6 +71,7 @@ class Pipeline():
         self.image = None #placeholder for real image array
         self.binned_deep_mask = None #placeholder for binned_deep_mask
         self.deep_mask = None #placeholder for unet mask image array
+        self.deep_winners_mask = None
         self.cytomask = None
         self.active_zone_mask = None
         self.deep_labels = None #placeholder for cleaned label array
@@ -204,26 +206,42 @@ class Pipeline():
             err = f"""the following file(s) and/or directory(s) are missing: {", ".join(missing)}"""
             raise IOError(err)
 
+    def prepare_deep(self, erase_existing=False):
+        self.deep_dir.mkdir(exist_ok=True)
+        if erase_existing:
+            for p in self.deep_dir.glob("*"):
+                p.unlink()
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = False
+        tf.keras.backend.set_session(tf.Session(config=config))
+        self.network_size = 64
+
     def run_deep(self, force_run=False, rescale=0.5):
         """
         Merged vesicle_segmentation and run_deep to make it a pipeline method
         all output files are saved in self.deep_dir
         """
         print("Prepyto pipeline: Running unet segmentation if there are less than 7 file in ./deep directory")
-        #if not os.path.exists('deep') or len(list(os.walk('./deep'))[0][2])<7:
+        self.prepare_deep(erase_exiting=force_run)
         if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 7 and not force_run:
             return
-        #create deep_dir (if it does not exist)
-        self.deep_dir.mkdir(exist_ok=True)
-        #delete every file in deep_dir (not that if it contains directory it will raise a PermissionError)
-        for p in self.deep_dir.glob("*"):
-            p.unlink()
-        config = tf.ConfigProto()
-        config.gpu_options.allow_growth = False
-        tf.keras.backend.set_session(tf.Session(config=config))
-        network_size = 64
-        segseg.full_segmentation(network_size, str(self.unet_weight_path.absolute()), self.image_path,
+        segseg.full_segmentation(self.network_size, str(self.unet_weight_path.absolute()), self.image_path,
                                   self.deep_dir, rescale=rescale, gauss=True)
+
+    def run_deep_at_multiple_rescale(self, min_rescale=0.1, max_rescale=1, nsteps=10):
+        max_deep_mask = np.zeros_like(self.image, dtype=np.float)
+        deep_winners_mask = np.zeros_like(self.image, dtype=np.float)
+        for rescale in np.linspace(min_rescale,max_rescale,num=nsteps,endpoint=True):
+            print(f"Prepyto pipeline: run_deep_at_multiple_rescale - rescale = {rescale}")
+            self.run_deep(force_run=True, rescale=rescale)
+            self.zoom(force_run=True)
+            winning_indices = np.argwhere(self.deep_mask > max_deep_mask)
+            max_deep_mask[winning_indices] = self.deep_mask[winning_indices]
+            deep_winners_mask[winning_indices] = rescale
+        self.deep_mask = deep_winners_mask
+        prepyto.save_label_to_mrc(self.deep_mask, self.deep_mask_path, template_path=self.image_path)
+        self.deep_winners_mask = deep_winners_mask
+        prepyto.save_label_to_mrc(self.deep_winners_mask, self.deep_winners_mask_path, template_path=self.image_path)
 
     def setup_prepyto_dir(self, make_masks = True, memkill = True):
         print("Prepyto Pipeline: setting up prepyto directory")
