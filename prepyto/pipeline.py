@@ -235,9 +235,9 @@ class Pipeline():
             print(f"Prepyto pipeline: run_deep_at_multiple_rescale - rescale = {rescale}")
             self.run_deep(force_run=True, rescale=rescale)
             self.zoom(force_run=True)
-            winning_indices = np.argwhere(self.deep_mask > max_deep_mask)
-            max_deep_mask[winning_indices] = self.deep_mask[winning_indices]
-            deep_winners_mask[winning_indices] = rescale
+            larger_mask = self.deep_mask > max_deep_mask
+            max_deep_mask[larger_mask] = self.deep_mask[larger_mask]
+            deep_winners_mask[larger_mask] = rescale
         self.deep_mask = deep_winners_mask
         prepyto.save_label_to_mrc(self.deep_mask, self.deep_mask_path, template_path=self.image_path)
         self.deep_winners_mask = deep_winners_mask
