@@ -222,7 +222,7 @@ class Pipeline():
         all output files are saved in self.deep_dir
         """
         print("Prepyto pipeline: Running unet segmentation if there are less than 7 file in ./deep directory")
-        self.prepare_deep(erase_exiting=force_run)
+        self.prepare_deep(erase_existing=force_run)
         if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 7 and not force_run:
             return
         segseg.full_segmentation(self.network_size, str(self.unet_weight_path.absolute()), self.image_path,
@@ -238,7 +238,7 @@ class Pipeline():
             winning_indices = np.argwhere(self.deep_mask > max_deep_mask)
             max_deep_mask[winning_indices] = self.deep_mask[winning_indices]
             deep_winners_mask[winning_indices] = rescale
-        self.deep_mask = deep_winners_mask
+        self.deep_mask = max_deep_mask
         prepyto.save_label_to_mrc(self.deep_mask, self.deep_mask_path, template_path=self.image_path)
         self.deep_winners_mask = deep_winners_mask
         prepyto.save_label_to_mrc(self.deep_winners_mask, self.deep_winners_mask_path, template_path=self.image_path)
