@@ -242,7 +242,7 @@ class Pipeline():
             larger_mask = self.deep_mask > max_deep_mask
             max_deep_mask[larger_mask] = self.deep_mask[larger_mask]
             deep_winners_mask[larger_mask] = rescale
-        self.deep_mask = deep_winners_mask
+        self.deep_mask = max_deep_mask
         prepyto.save_label_to_mrc(self.deep_mask, self.deep_mask_path, template_path=self.image_path)
         self.deep_winners_mask = deep_winners_mask
         prepyto.save_label_to_mrc(self.deep_winners_mask, self.deep_winners_mask_path, template_path=self.image_path)
