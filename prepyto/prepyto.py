@@ -340,6 +340,7 @@ def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
         print(f"failed, label {label}")
         keep_label = False
         thickness = np.nan
+        density = np.nan
         new_radius = np.nan
     return density, keep_label, new_centroid, new_radius, thickness
 
@@ -390,6 +391,29 @@ def remove_labels_under_points(image_label, points_to_remove):
     corrected_labels[selection_mask] = 0
     return corrected_labels
 
+def expand_small_labels(deep_mask, labels, initial_threshold, min_vol):
+    expanded_labels = labels.copy()
+    vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area', 'centroid')))
+    small_labels = vesicle_regions[vesicle_regions.area < min_vol * 0.2].set_index('label')
+    step = 0.025
+    for threshold in tqdm(np.arange((initial_threshold-step), 0.8, -step), desc="Expanding labels until none is too small"):
+        labels = skimage.morphology.label(deep_mask>threshold)
+        new_vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area')))
+        new_vesicle_regions.set_index('label')
+        small_labels_fixed = []
+        for label, row in small_labels.iterrows():
+            centroid = (row['centroid-0'],row['centroid-1'],row['centroid-2'])
+            centroid = tuple(np.array(centroid).astype(np.int))
+            new_label = labels[centroid]
+            new_vol = new_vesicle_regions.loc[new_label].area
+            if new_vol > 0.2 * min_vol:
+                expanded_labels[np.where(labels==new_label)] = label
+                small_labels_fixed.append(label)
+        small_labels = small_labels.drop(labels=small_labels_fixed)
+        if len(small_labels) == 0 :
+            break
+    return expanded_labels, small_labels
+
 def add_sphere_labels_under_points(image, image_labels, points_to_add,
                                    points_to_add_sizes, minimum_box_size):
     corrected_labels = image_labels.copy()
@@ -439,11 +463,22 @@ def put_spherical_label_in_array(array, rounded_centroid, radius, label, inplace
     if not inplace:
         array = array.copy()
     px, py, pz = np.where(sphere)
-    array[px + rounded_centroid[0] - radius,
-          py + rounded_centroid[1] - radius,
-          pz + rounded_centroid[2] - radius] = label
+    px = px + rounded_centroid[0] - radius
+    py = py + rounded_centroid[1] - radius
+    pz = pz + rounded_centroid[2] - radius
+    px, py, pz = remove_out_of_range_indices(array, px,py,pz)
+    array[px,py,pz] = label
     if not inplace:
         return array
+
+def remove_out_of_range_indices(array,px,py,pz):
+    s = array.shape
+    indices = np.array((px,py,pz))
+    for i in range(3):
+        to_remove = list(np.argwhere(indices[i]<0))
+        to_remove += list(np.argwhere(indices[i]>s[i]-1))
+        indices = np.delete(indices,to_remove,axis=1)
+    return indices[0], indices[1], indices[2]
 
 def put_original_label_in_array(array, label_box, label, rounded_centroid, radius, inplace = False):
     label_mask = label_box == label
@@ -476,6 +511,7 @@ def get_bounding_box_from_centroid_and_radius(rounded_3d_centroid, radius):
     radius = int(round(radius))
     bounding_box[:,0] = rounded_3d_centroid - radius
     bounding_box[:,1] = rounded_3d_centroid + radius
+    bounding_box[bounding_box < 0] = 0
     return bounding_box
 
 
@@ -526,6 +562,18 @@ def clip_box_to_image_size(image, bbox):
     clipped_bbox[:, 1] = np.minimum(image.shape, bbox[:, 1])
     return clipped_bbox
 
+def crop_edges(image, radius):
+    """sets all pixels at a distance lower than radius from the edge of the image to 0
+    """
+    mask = np.ones_like(image)
+    radius = int(np.ceil(radius))
+    mask[:radius,] = 0
+    mask[-radius:,] = 0
+    mask[:,:radius] = 0
+    mask[:,-radius:] = 0
+    mask[:,:,:radius] = 0
+    mask[:,:,-radius:] = 0
+    return mask * image
 
 def get_label_largest_radius(bbox):
     radii = get_label_radii(bbox)

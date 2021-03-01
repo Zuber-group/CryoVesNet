@@ -232,7 +232,9 @@ class Pipeline():
         segseg.full_segmentation(self.network_size, str(self.unet_weight_path.absolute()), self.image_path,
                                   self.deep_dir, rescale=rescale, gauss=True)
 
-    def run_deep_at_multiple_rescale(self, min_rescale=0.1, max_rescale=1, nsteps=10):
+    def run_deep_at_multiple_rescale(self, max_voxel_size=3.14, min_voxel_size=1.57, nsteps=8):
+        min_rescale = self.voxel_size / max_voxel_size
+        max_rescale = self.voxel_size / min_voxel_size
         max_deep_mask = np.zeros_like(self.image, dtype=np.float16)
         deep_winners_mask = np.zeros_like(self.image, dtype=np.float16)
         for rescale in np.linspace(min_rescale,max_rescale,num=nsteps,endpoint=True):
@@ -274,6 +276,29 @@ class Pipeline():
                                                   preserve_range=True).astype(np.float32)
 
         prepyto.save_label_to_mrc(self.deep_mask, self.deep_mask_path, template_path=self.image_path)
+        if memkill:
+            self.clear_memory(exclude=[self.last_output_array_name, 'image'])
+        self.print_output_info()
+
+    def label_vesicles_simply(self,input_array_name='deep_mask', threshold=0.986, within_segmentation_region = True,
+                       memkill=True):
+        print("Prepyto Pipeline: running label_vesicles_simply")
+        self.set_array('image')
+        self.set_array(input_array_name)
+        self.deep_mask = getattr(self, input_array_name)
+        self.deep_mask = prepyto.crop_edges(self.deep_mask, radius=self.min_radius)
+        if within_segmentation_region:
+            self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
+        deep_labels = skimage.morphology.label(self.deep_mask > threshold)
+        deep_labels, small_labels = prepyto.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol)
+        if len(small_labels):
+            print("The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
+            print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
+            print(small_labels)
+        self.deep_labels = deep_labels.astype(np.uint16)
+        prepyto.save_label_to_mrc(self.deep_labels, self.deep_labels_path, template_path=self.image_path)
+        #free up memory
+        self.last_output_array_name = 'deep_labels'
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
@@ -407,6 +432,7 @@ class Pipeline():
     def fix_spheres_interactively(self, input_array_name='last_output_array_name', memkill=True):
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
+        self.set_array('image')
         self.set_array(input_array_name)
         points_to_remove, points_to_add, points_to_add_sizes = visualization.add_points_remove_labels(self.image,
                                                                                                       getattr(self,input_array_name))

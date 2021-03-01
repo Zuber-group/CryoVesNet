@@ -13,7 +13,6 @@ from . import unetmic as umic
 from . import segment as segment
 
 def find_threshold(image, image_mask):
-    
     #first, calculate shell-intensity at different thresholds
     shell_pixels = []
     for th in tqdm(np.arange(0.8, 1, 0.01), desc='finding global threshold on unet mask'):
