@@ -233,11 +233,12 @@ class Pipeline():
                                   self.deep_dir, rescale=rescale, gauss=True)
 
     def run_deep_at_multiple_rescale(self, max_voxel_size=3.14, min_voxel_size=1.57, nsteps=8):
+        self.set_array('image')
         min_rescale = self.voxel_size / max_voxel_size
         max_rescale = self.voxel_size / min_voxel_size
         max_deep_mask = np.zeros_like(self.image, dtype=np.float16)
         deep_winners_mask = np.zeros_like(self.image, dtype=np.float16)
-        for rescale in np.linspace(min_rescale,max_rescale,num=nsteps,endpoint=True):
+        for rescale in tqdm(np.linspace(min_rescale,max_rescale,num=nsteps,endpoint=True)):
             print(f"Prepyto pipeline: run_deep_at_multiple_rescale - rescale = {rescale}")
             self.run_deep(force_run=True, rescale=rescale)
             self.zoom(force_run=True)
