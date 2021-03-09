@@ -511,17 +511,32 @@ def get_bounding_box_from_centroid_and_radius(rounded_3d_centroid, radius):
     radius = int(round(radius))
     bounding_box[:,0] = rounded_3d_centroid - radius
     bounding_box[:,1] = rounded_3d_centroid + radius
-    bounding_box[bounding_box < 0] = 0
+    #bounding_box[bounding_box < 0] = 0
     return bounding_box
 
 
 def extract_box_of_radius(image, rounded_centroid, radius):
     bbox = get_bounding_box_from_centroid_and_radius(rounded_centroid, radius)
+    bbox = shrink_cubic_bbox_to_fit_image(bbox, radius, image.shape)
     sub_image = image[bbox[0,0]:bbox[0,1],
                       bbox[1,0]:bbox[1,1],
                       bbox[2,0]:bbox[2,1]]
     return sub_image
 
+def shrink_cubic_bbox_to_fit_image(bbox, radius, image_shape):
+    image_bounding_box = np.array(((0,image_shape[0]),(0,image_shape[1]),(0,image_shape[2])))
+    zeros = np.zeros(bbox.shape)
+    protrusions = np.copy(zeros)
+    protrusions[:,0] = image_bounding_box[:,0] - bbox[:,0]
+    protrusions[:,1] = bbox[:,1] - image_bounding_box[:,1]
+    #whereever protrusion is larger than zero, the bounding box is protruding from the image
+    protrusions = np.maximum(protrusions, zeros)
+    #next we calculate for each dimension how much the bbox protrudes from the image (sum)
+    #and we take the maximum value of all. This by how much we need to reduce the box size at least
+    correction = int(protrusions.sum(axis=1).max())
+    bbox[:,0] += correction
+    bbox[:,1] -= correction
+    return bbox
 
 def extract_extended_box(image, bbox, extension):
     extended_bbox = get_extended_bbox(bbox, extension)
