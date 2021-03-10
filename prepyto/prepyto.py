@@ -399,7 +399,7 @@ def expand_small_labels(deep_mask, labels, initial_threshold, min_vol):
     for threshold in tqdm(np.arange((initial_threshold-step), 0.8, -step), desc="Expanding labels until none is too small"):
         labels = skimage.morphology.label(deep_mask>threshold)
         new_vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area')))
-        new_vesicle_regions.set_index('label')
+        new_vesicle_regions.set_index('label', inplace=True)
         small_labels_fixed = []
         for label, row in small_labels.iterrows():
             centroid = (row['centroid-0'],row['centroid-1'],row['centroid-2'])
