@@ -17,6 +17,7 @@ from . import weights
 #import evaluation_class
 from . import mrc_cleaner
 from . import visualization
+from . import evaluation_class
 import numpy as np
 import pandas as pd
 import mrcfile
@@ -193,11 +194,12 @@ class Pipeline():
             my_list = [obj]
         return my_list
 
-    def check_files(self, file_list=['dir', 'image_path', 'active_zone_mod_path',
+    def check_files(self, file_list=['dir', 'image_path',
                                      'cell_outline_mod_path']):
         """
         Check if all input files as specified in file_list exist
         """
+        # file_list = ['dir', 'image_path', 'active_zone_mod_path','cell_outline_mod_path']
         missing = []
         for p_str in file_list:
             p = getattr(self,p_str)
@@ -283,6 +285,7 @@ class Pipeline():
 
     def label_vesicles_simply(self,input_array_name='deep_mask', threshold=0.986, within_segmentation_region = True,
                        memkill=True):
+        #986
         print("Prepyto Pipeline: running label_vesicles_simply")
         self.set_array('image')
         self.set_array(input_array_name)
@@ -371,7 +374,7 @@ class Pipeline():
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        self.convex_labels = prepyto.fast_pacman_killer(getattr(self, input_array_name))
+        self.convex_labels = prepyto.pacman_killer(getattr(self, input_array_name))
         prepyto.save_label_to_mrc(self.convex_labels, self.convex_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'convex_labels'
         if memkill:
@@ -435,13 +438,14 @@ class Pipeline():
             input_array_name = self.last_output_array_name
         self.set_array('image')
         self.set_array(input_array_name)
-        points_to_remove, points_to_add, points_to_add_sizes = visualization.add_points_remove_labels(self.image,
+        points_to_remove, points_to_add, points_to_add_sizes = visualization.add_points_remove_labels(self,
                                                                                                       getattr(self,input_array_name))
         minimum_box_size = self.voxel_size * 50
         self.mancorr_labels = prepyto.remove_labels_under_points(getattr(self, input_array_name), points_to_remove)
         self.mancorr_labels = prepyto.add_sphere_labels_under_points(self.image,self.mancorr_labels, points_to_add,
                                                                      points_to_add_sizes, minimum_box_size)
         self.last_output_array_name = 'mancorr_labels'
+        print('Last save procedures')
         prepyto.save_label_to_mrc(self.mancorr_labels, self.mancorr_labels_path, template_path=self.image_path)
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
@@ -584,9 +588,13 @@ class Pipeline():
 
 
     def evaluation(self, reference_path=None, prediction_path=None):
+        # if input_array_name == 'last_output_array_name':
+        #     input_array_name = self.last_output_array_name
+        # self.set_array(input_array_name)
+        # input_array_name = 'last_output_array_name'
         reference_path=mrc_cleaner.ask_file_path(self.dir,file_extension=('.mrc'))
         if prediction_path==None:
-            prediction_path = mrc_cleaner.ask_file_path(self.dir,file_extension=('.mrc'))
+            prediction_path = mrc_cleaner.ask_file_path(self.save_dir,file_extension=('.mrc'))
             prediction = mrcfile.open(prediction_path)
         else:
             prediction = self.last_output_array
@@ -599,7 +607,7 @@ class Pipeline():
         real_image= self.image
         mask = reference.data
         print(np.shape(mask))
-        mask = mask >= 10
+        mask = mask >= 1
         corrected_labels = prediction.data
         corrected_labels = corrected_labels >= 10
         evaluator = evaluation_class.ConfusionMatrix(corrected_labels, mask)
@@ -608,4 +616,4 @@ class Pipeline():
         print("The Pixel Accuracy is: " + str(evaluator.accuracy()))
         print("The  Intersection-Over-Union is: " + str(evaluator.jaccard_index()))
         print("The Dice Metric: " + str(evaluator.dice_metric()))
-        # visualization.viz_labels(real_image, [mask, corrected_labels], ['grand truth', 'New'])
+        visualization.viz_labels(self.image, [mask, corrected_labels], ['ground truth', 'New'])
