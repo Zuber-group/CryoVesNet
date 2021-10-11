@@ -283,9 +283,10 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
-    def label_vesicles_simply(self, input_array_name='deep_mask', threshold=0.986, within_segmentation_region=True,
+    def label_vesicles_simply(self, input_array_name='deep_mask', threshold_coef=1, within_segmentation_region=True,
                               memkill=True):
-        # 986
+        # threshold_coef=0.986
+
         print("Prepyto Pipeline: running label_vesicles_simply")
         self.set_array('image')
         self.set_array(input_array_name)
@@ -293,6 +294,10 @@ class Pipeline():
         self.deep_mask = prepyto.crop_edges(self.deep_mask, radius=self.min_radius)
         if within_segmentation_region:
             self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
+
+        opt_th, mean_shell_val = prepyto.my_threshold(self.image, self.deep_mask)
+        threshold = threshold_coef * opt_th
+
         deep_labels = skimage.morphology.label(self.deep_mask > threshold)
         deep_labels, small_labels = prepyto.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol)
         if len(small_labels):
