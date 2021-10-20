@@ -339,6 +339,11 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
+    def mask_loader(self):
+        max_mask = mrcfile.open(self.deep_winners_mask_path)
+        self.deep_mask = max_mask.data
+        prepyto.save_label_to_mrc(self.deep_mask, self.deep_mask_path, template_path=self.image_path)
+
     def outcell_remover(self, input_array_name='last_output_array_name',
                         output_array_name='deep_labels', memkill=True, force_generate=False):
         print("Prepyto Pipeline: restricting labels to segmentation region")
