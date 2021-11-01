@@ -611,7 +611,9 @@ class Pipeline():
             prediction_path = mrc_cleaner.ask_file_path(self.save_dir, file_extension=('.mrc'))
             prediction = mrcfile.open(prediction_path)
         else:
-            prediction = self.last_output_array
+            prediction_path = mrc_cleaner.ask_file_path(self.dir / prediction_path, file_extension=('.mrc'))
+            prediction = mrcfile.open(prediction_path)
+            # prediction = self.last_output_array
 
         reference = mrcfile.open(reference_path)
         # maskfile = mrcfile.open('./compare/labels_manual.mrc')
@@ -621,13 +623,14 @@ class Pipeline():
         real_image = self.image
         mask = reference.data
         print(np.shape(mask))
-        mask = mask >= 1
+        mask = mask >= 10
         corrected_labels = prediction.data
-        corrected_labels = corrected_labels >= 10
-        evaluator = evaluation_class.ConfusionMatrix(corrected_labels, mask)
+        corrected_labels_mask = corrected_labels >= 10
+        evaluator = evaluation_class.ConfusionMatrix(corrected_labels_mask, mask)
         print(evaluator)
 
         print("The Pixel Accuracy is: " + str(evaluator.accuracy()))
         print("The  Intersection-Over-Union is: " + str(evaluator.jaccard_index()))
         print("The Dice Metric: " + str(evaluator.dice_metric()))
+        print("Former Dice: " + str(evaluator.former_dice(corrected_labels, mask)))
         visualization.viz_labels(self.image, [mask, corrected_labels], ['ground truth', 'New'])
