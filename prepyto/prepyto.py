@@ -405,8 +405,13 @@ def expand_small_labels(deep_mask, labels, initial_threshold, min_vol):
             centroid = (row['centroid-0'],row['centroid-1'],row['centroid-2'])
             centroid = tuple(np.array(centroid).astype(np.int))
             new_label = labels[centroid]
+
+
+
+
+
             new_vol = new_vesicle_regions.loc[new_label].area
-            if new_vol > 0.2 * min_vol:
+            if new_vol >= 0.2 * min_vol:
                 expanded_labels[np.where(labels==new_label)] = label
                 small_labels_fixed.append(label)
         small_labels = small_labels.drop(labels=small_labels_fixed)
@@ -715,7 +720,11 @@ def get_optimal_sphere_radius_from_image(image):
     return optimal_radius
 
 def get_shift_between_images(reference_image, moving_image):
-    shift, _, _ = skimage.registration.phase_cross_correlation(reference_image, moving_image)
+    try:
+        shift, _, _ = skimage.registration.phase_cross_correlation(reference_image, moving_image)
+    except ValueError:
+        shift = np.zeros(3)
+        print("get_shift_between_images failed, shift set to 0,0,0")
     return shift
 
 def get_shift_of_sphere(image,origin=None):
