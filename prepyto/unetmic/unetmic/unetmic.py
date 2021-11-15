@@ -68,17 +68,16 @@ def dice_coef(y_true, y_pred):
     return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
 
 
-def create_unet_3d(inputsize = (32,32,32,1)):
-    
-    n_depth = 2
-    n_filter_base = 16
-    kernel_size = (3,3,3)
-    activation= 'relu'
-    batch_norm=False
-    dropout=0.0
-    n_conv_per_depth = 2
-    pool_size=(2,2,2)
-    n_channel_out = 1
+def create_unet_3d(inputsize = (32,32,32,1),
+                   n_depth = 2,
+                   n_filter_base = 16,
+                   kernel_size = (3,3,3),
+                   activation= 'relu',
+                   batch_norm=False,
+                   dropout=0.0,
+                   n_conv_per_depth = 2,
+                   pool_size=(2,2,2),
+                   n_channel_out = 1):
     n_dim = len(kernel_size)
 
     input = Input(inputsize, name = "input")
