@@ -55,7 +55,7 @@ def mask_clean_up(image_label, background = 0):
 
 def full_segmentation(network_size, unet_weigth_path, path_to_file, folder_to_save, rescale = 1, gauss = False):
     #load the network and weights
-    unet_vesicle = umic.create_unet_3d(inputsize=(network_size,network_size,network_size,1))
+    unet_vesicle = umic.create_unet_3d(inputsize=(network_size,network_size,network_size,1),n_depth = 2, n_filter_base = 16, batch_norm = True, dropout = 0.0, n_conv_per_depth = 2)
     unet_vesicle.load_weights(unet_weigth_path)
 
     #load image
@@ -73,6 +73,7 @@ def full_segmentation(network_size, unet_weigth_path, path_to_file, folder_to_sa
     image = (image-np.mean(image))/np.std(image)
     #do training
     image_mask = umic.run_segmentation(image, unet_vesicle)
+    # image_mask = umic.agumentaion_predict(image, unet_vesicle)
     #save raw output as npy
     umic.save_seg_output(image_mask, path_to_file, folder_to_save)
 
@@ -80,22 +81,21 @@ def full_segmentation(network_size, unet_weigth_path, path_to_file, folder_to_sa
 
     image_label_opt = skimage.morphology.label(image_mask>opt_th)
 
-    clean_mask, clean_labels = mask_clean_up(image_label_opt)
+    # clean_mask, clean_labels = mask_clean_up(image_label_opt)
 
     #export 
     #clean_mask = (255*np.flip(clean_mask,axis = 1)).astype(np.uint8)
-    clean_mask = (255*clean_mask).astype(np.uint8)
-    skimage.io.imsave(os.path.normpath(folder_to_save)+'/'+os.path.splitext(os.path.split(path_to_file)[1])[0]+'_clean_mask.tiff',
-                      clean_mask, plugin = 'tifffile')
-
-    clean_labels =clean_labels.astype(np.uint16)
-    skimage.io.imsave(os.path.normpath(folder_to_save)+'/'+os.path.splitext(os.path.split(path_to_file)[1])[0]+'_clean_label.tiff',
-                      clean_labels, plugin = 'tifffile')
+    # clean_mask = (255*clean_mask).astype(np.uint8)
+    # skimage.io.imsave(os.path.normpath(folder_to_save)+'/'+os.path.splitext(os.path.split(path_to_file)[1])[0]+'_clean_mask.tiff',
+    #                   clean_mask, plugin = 'tifffile')
+    #
+    # clean_labels =clean_labels.astype(np.uint16)
+    # skimage.io.imsave(os.path.normpath(folder_to_save)+'/'+os.path.splitext(os.path.split(path_to_file)[1])[0]+'_clean_label.tiff',
+    #                   clean_labels, plugin = 'tifffile')
     
     skimage.io.imsave(os.path.normpath(folder_to_save)+'/'+os.path.splitext(os.path.split(path_to_file)[1])[0]+'_wreal_mask.tiff',
                       image_mask, plugin = 'tifffile')
 
 
-    
-    with mrcfile.new(os.path.normpath(folder_to_save)+'/'+os.path.splitext(os.path.split(path_to_file)[1])[0]+'_clean_label.mrc') as mrc:
-        mrc.set_data(clean_labels+10)
+    # with mrcfile.new(os.path.normpath(folder_to_save)+'/'+os.path.splitext(os.path.split(path_to_file)[1])[0]+'_clean_label.mrc') as mrc:
+    #     mrc.set_data(clean_labels+10)

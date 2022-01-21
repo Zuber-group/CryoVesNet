@@ -14,6 +14,7 @@ def viz_labels(image,list_of_labels,list_of_names):
             # labels_layer = view.add_labels(old_labels-10)
 
             labels_layer = view.add_labels(list_of_labels[i], name=list_of_names[i])
+            
     return None
 
 def add_points_remove_labels(pipe, labels_to_analyze, additional_labels=None ):
