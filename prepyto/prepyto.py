@@ -316,23 +316,11 @@ def get_sphere_dataframe(image, image_label, margin=5):
 
 
 def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
-    image_box = extract_box_of_radius(image, rounded_centroid, radius + margin)
-    need_reextract = True
-    max_shift = 0.75 * np.linalg.norm(image_box.shape)
-    total_shift = np.zeros(3)
-    while need_reextract:
-        shift, need_reextract = get_optimal_sphere_position(image_box)
-        # if need_reextract:
-        #     print(f"need_reextract with label {label}")
-        total_shift = total_shift + shift
-        if np.linalg.norm(total_shift) > max_shift:
-            keep_label = False
-            break
-        new_centroid = (rounded_centroid - total_shift).astype(np.int)
-        image_box = extract_box_of_radius(image, new_centroid, radius + margin)
+    shift, new_radius = get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=margin)
+    new_centroid = (rounded_centroid - shift).astype(np.int)
+    image_box = extract_box_of_radius(image, new_centroid, radius + margin)
     try:
         thickness, density = get_sphere_membrane_thickness_and_density_from_image(image_box)
-        new_radius = get_optimal_sphere_radius_from_image(image_box)
         keep_label = True
         # if thickness < 6:
         #     print(f"small thickness, label {label}")
@@ -665,7 +653,7 @@ def get_optimal_sphere_radius_from_radial_profile(radial_profile):
     i_upper_limit = get_radial_profile_i_upper_limit(radial_profile)
     i_membrane_outer_halo = i_membrane_center + radial_profile[i_membrane_center:i_upper_limit].argmax()
     derivative2 = np.diff(radial_profile,2)
-    optimal_radius = i_membrane_center + ndimage.gaussian_filter1d(derivative2[i_membrane_center:i_membrane_outer_halo],1).argmin()
+    optimal_radius = i_membrane_center + ndimage.gaussian_filter1d(derivative2, 1)[i_membrane_center:i_membrane_outer_halo+1].argmin()
     return(optimal_radius)
 
 
@@ -708,22 +696,28 @@ def get_shift_of_sphere(image,origin=None):
     shift = get_shift_between_images(average_image, image)
     return shift
 
-def get_optimal_sphere_position(image,max_cycles=10,max_shift_ratio=0.25):
-    need_reextracting = False
+def get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=5, max_cycles=10, max_shift_ratio=0.5):
+    image_box = extract_box_of_radius(image, rounded_centroid, radius + margin)
     max_shift = max_shift_ratio * np.linalg.norm(image.shape)
     total_shift = np.array((0,0,0))
-    shifted_image = image.copy()
+    no_change_count = 0
     for i in range(max_cycles):
-        shift = get_shift_of_sphere(shifted_image)
+        shift = get_shift_of_sphere(image_box)
         total_shift = total_shift + shift
         if np.linalg.norm(total_shift) > max_shift:
-            need_reextracting = True
+            total_shift -= shift
             break
-        #print(f"round {i}, shift is {shift}, total shift is {total_shift}")
+        new_centroid = (rounded_centroid - total_shift).astype(np.int)
         if np.all(shift == np.zeros(3)):
+            no_change_count += 1
+        if no_change_count > 1:
             break
-        shifted_image = ndimage.shift(image,total_shift)
-    return total_shift, need_reextracting
+        image_box = extract_box_of_radius(image, new_centroid, radius + margin)
+        new_radius = get_optimal_sphere_radius_from_image(image_box)
+        if new_radius != radius:
+            radius = new_radius
+            image_box = extract_box_of_radius(image, new_centroid, radius + margin)
+    return total_shift, radius
 
 def rearrange_labels(image_label, dtype=np.int16):
     """rearrange the labels so that they go from 1 to n labels. Label order is preserved. The goal
