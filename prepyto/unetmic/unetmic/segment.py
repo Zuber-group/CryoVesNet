@@ -55,7 +55,7 @@ def mask_clean_up(image_label, background = 0):
 
 def full_segmentation(network_size, unet_weigth_path, path_to_file, folder_to_save, rescale = 1, gauss = False):
     #load the network and weights
-    unet_vesicle = umic.create_unet_3d(inputsize=(network_size,network_size,network_size,1))
+    unet_vesicle = umic.create_unet_3d(inputsize=(network_size,network_size,network_size,1),n_depth = 2, n_filter_base = 16, batch_norm = True, dropout = 0.0, n_conv_per_depth = 2)
     unet_vesicle.load_weights(unet_weigth_path)
 
     #load image

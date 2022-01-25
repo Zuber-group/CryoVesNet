@@ -31,5 +31,15 @@ class ConfusionMatrix:
         return self.tp / \
                (self.tp + self.fp + self.fn)
 
+    def former_dice(self, prediction, reference):
+        y_true = reference
+        y_pred = prediction
+        smooth = 1
+        y_true_f = y_true.flatten()
+        y_pred_f = y_pred.flatten()
+        intersection = np.sum(y_true_f * y_pred_f)
+        return (2. * intersection + smooth) / (np.sum(y_true_f) + np.sum(y_pred_f) + smooth)
+
     def __str__(self):
-        return("true positive: "+str(self.tp)+"\ntrue negative: " + str(self.tn) +"\nfalse positive: " + str(self.fp) + "\nfalse negative: " + str(self.fn))
+        return ("true positive: " + str(self.tp) + "\ntrue negative: " + str(self.tn) + "\nfalse positive: " + str(
+            self.fp) + "\nfalse negative: " + str(self.fn))

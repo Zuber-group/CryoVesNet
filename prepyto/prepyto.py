@@ -387,14 +387,19 @@ def expand_small_labels(deep_mask, labels, initial_threshold, min_vol):
     for threshold in tqdm(np.arange((initial_threshold-step), 0.8, -step), desc="Expanding labels until none is too small"):
         labels = skimage.morphology.label(deep_mask>threshold)
         new_vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area')))
-        new_vesicle_regions.set_index('label')
+        new_vesicle_regions.set_index('label', inplace=True)
         small_labels_fixed = []
         for label, row in small_labels.iterrows():
             centroid = (row['centroid-0'],row['centroid-1'],row['centroid-2'])
             centroid = tuple(np.array(centroid).astype(np.int))
             new_label = labels[centroid]
+
+
+
+
+
             new_vol = new_vesicle_regions.loc[new_label].area
-            if new_vol > 0.2 * min_vol:
+            if new_vol >= 0.2 * min_vol:
                 expanded_labels[np.where(labels==new_label)] = label
                 small_labels_fixed.append(label)
         small_labels = small_labels.drop(labels=small_labels_fixed)
@@ -499,17 +504,32 @@ def get_bounding_box_from_centroid_and_radius(rounded_3d_centroid, radius):
     radius = int(round(radius))
     bounding_box[:,0] = rounded_3d_centroid - radius
     bounding_box[:,1] = rounded_3d_centroid + radius
-    bounding_box[bounding_box < 0] = 0
+    #bounding_box[bounding_box < 0] = 0
     return bounding_box
 
 
 def extract_box_of_radius(image, rounded_centroid, radius):
     bbox = get_bounding_box_from_centroid_and_radius(rounded_centroid, radius)
+    bbox = shrink_cubic_bbox_to_fit_image(bbox, radius, image.shape)
     sub_image = image[bbox[0,0]:bbox[0,1],
                       bbox[1,0]:bbox[1,1],
                       bbox[2,0]:bbox[2,1]]
     return sub_image
 
+def shrink_cubic_bbox_to_fit_image(bbox, radius, image_shape):
+    image_bounding_box = np.array(((0,image_shape[0]),(0,image_shape[1]),(0,image_shape[2])))
+    zeros = np.zeros(bbox.shape)
+    protrusions = np.copy(zeros)
+    protrusions[:,0] = image_bounding_box[:,0] - bbox[:,0]
+    protrusions[:,1] = bbox[:,1] - image_bounding_box[:,1]
+    #whereever protrusion is larger than zero, the bounding box is protruding from the image
+    protrusions = np.maximum(protrusions, zeros)
+    #next we calculate for each dimension how much the bbox protrudes from the image (sum)
+    #and we take the maximum value of all. This by how much we need to reduce the box size at least
+    correction = int(protrusions.sum(axis=1).max())
+    bbox[:,0] += correction
+    bbox[:,1] -= correction
+    return bbox
 
 def extract_extended_box(image, bbox, extension):
     extended_bbox = get_extended_bbox(bbox, extension)
@@ -688,7 +708,11 @@ def get_optimal_sphere_radius_from_image(image):
     return optimal_radius
 
 def get_shift_between_images(reference_image, moving_image):
-    shift, _, _ = skimage.registration.phase_cross_correlation(reference_image, moving_image)
+    try:
+        shift, _, _ = skimage.registration.phase_cross_correlation(reference_image, moving_image)
+    except ValueError:
+        shift = np.zeros(3)
+        print("get_shift_between_images failed, shift set to 0,0,0")
     return shift
 
 def get_shift_of_sphere(image,origin=None):
