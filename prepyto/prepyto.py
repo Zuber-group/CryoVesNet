@@ -435,6 +435,8 @@ def get_centroids_from_regions(vesicle_regions):
     centroids = np.array(centroids)
     return centroids
 
+
+
 def remove_outliers(deep_labels,ves_table, min_vol ,delta_size = 1):
     new_label = deep_labels.copy()
     verysmall_vesicles = ves_table[(ves_table['extent'] < 0.3 ) | (ves_table['extent'] > 0.7) ]
@@ -442,8 +444,6 @@ def remove_outliers(deep_labels,ves_table, min_vol ,delta_size = 1):
     print(verysmall_vesicles)
     new_label[np.isin(new_label, verysmall_vesicles.index)] = 0
     return new_label
-
-
 
 def get_bboxes_from_regions(vesicle_regions):
     bboxes = []
