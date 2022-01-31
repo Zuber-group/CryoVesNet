@@ -522,6 +522,27 @@ def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1
     return old_label
 
 
+
+def sround_remover(deep_labels,mask,t):
+    mask = mask.copy()
+    deep_labels_temp = deep_labels.copy()
+    mask_invert = 1 - (mask)
+    extra = deep_labels_temp * mask_invert
+    extra_labels , counts= np.unique(extra, return_counts=True)
+    extra_labels = (extra_labels[counts > t/2])
+    print(extra_labels)
+
+    for i in extra_labels:
+        if i == 0:
+            pass
+        else:
+
+            px, py, pz = np.where(deep_labels== i)
+            deep_labels_temp[px, py, pz] = 0
+
+    return deep_labels_temp
+
+
 def get_bboxes_from_regions(vesicle_regions):
     bboxes = []
     for i in range(len(vesicle_regions['bbox-0'])):
