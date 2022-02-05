@@ -316,10 +316,10 @@ def get_sphere_dataframe(image, image_label, margin=5):
 
 
 def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
-    shift, new_radius = get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=margin)
-    new_centroid = (rounded_centroid - shift).astype(np.int)
-    image_box = extract_box_of_radius(image, new_centroid, radius + margin)
     try:
+        shift, new_radius = get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=margin)
+        new_centroid = (rounded_centroid - shift).astype(np.int)
+        image_box = extract_box_of_radius(image, new_centroid, radius + margin)
         thickness, density = get_sphere_membrane_thickness_and_density_from_image(image_box)
         keep_label = True
         # if thickness < 6:
@@ -330,6 +330,7 @@ def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
         thickness = np.nan
         density = np.nan
         new_radius = np.nan
+        new_centroid = rounded_centroid
     return density, keep_label, new_centroid, new_radius, thickness
 
 
@@ -404,6 +405,92 @@ def expand_small_labels(deep_mask, labels, initial_threshold, min_vol):
         if len(small_labels) == 0 :
             break
     return expanded_labels, small_labels
+
+
+def vesicles_table(labels):
+    ves_tabel = pd.DataFrame(
+        skimage.measure.regionprops_table(labels, properties=('label', 'area', 'centroid', 'bbox', 'extent')))
+    ves_tabel['area_zscore'] = (ves_tabel['area'] - ves_tabel['area'].mean()) / ves_tabel['area'].std(ddof=0)
+    ves_tabel['extent_zscore'] = (ves_tabel['extent'] - ves_tabel['extent'].mean()) / ves_tabel['extent'].std(ddof=0)
+
+    print("Tabel computed!")
+    return ves_tabel
+
+def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1):
+    collision_ves = ves_table[(ves_table['extent_zscore'] < -2) & (ves_table['area_zscore'] > 1)]
+    old_mask = deep_mask.copy()
+    old_label = deep_labels.copy()
+    for i in collision_ves.iterrows():
+        # print(i)
+        sub_old_mask = old_mask[
+                       collision_ves['bbox-0'][i[0]] - delta_size: collision_ves['bbox-3'][i[0]] + delta_size + 1,
+                       collision_ves['bbox-1'][i[0]] - delta_size: collision_ves['bbox-4'][i[0]] + delta_size + 1,
+                       collision_ves['bbox-2'][i[0]] - delta_size: collision_ves['bbox-5'][i[0]] + delta_size + 1]
+
+        sub_old_label = old_label[
+                        collision_ves['bbox-0'][i[0]] - delta_size: collision_ves['bbox-3'][i[0]] + delta_size + 1,
+                        collision_ves['bbox-1'][i[0]] - delta_size: collision_ves['bbox-4'][i[0]] + delta_size + 1,
+                        collision_ves['bbox-2'][i[0]] - delta_size: collision_ves['bbox-5'][i[0]] + delta_size + 1]
+
+        sub_old_label_mask = sub_old_label != collision_ves['label'][i[0]]
+        pxj, pyj, pzj = np.where(sub_old_label_mask)
+        sub_old_mask[pxj, pyj, pzj] = 0
+        thr = threshold
+        pre_labels, pre_nc = skimage.morphology.label(sub_old_mask > thr, return_num=True, connectivity=None)
+        # print(pre_nc)
+        is_break = 0
+        for th in np.arange(thr, 1, 0.01):
+            # temp=sub_old_label_mask>th
+            temp = sub_old_mask > th
+            labels, nc = skimage.morphology.label(temp, return_num=True, connectivity=None)
+            if nc > pre_nc:
+                is_break = 1
+                # print(pre_nc, nc)
+                px, py, pz = np.where(labels > 0)
+
+                pxq, pyq, pzq = np.where(~sub_old_label_mask)
+
+                old_label[pxq + collision_ves['bbox-0'][i[0]] - delta_size,
+                          pyq + collision_ves['bbox-1'][i[0]] - delta_size,
+                          pzq + collision_ves['bbox-2'][i[0]] - delta_size] = 0
+                # old_label[collision_ves['bbox-0'][i[0]] - delta_size: collision_ves['bbox-3'][i[0]] + delta_size + 1,
+                # collision_ves['bbox-1'][i[0]] - delta_size: collision_ves['bbox-4'][i[0]] + delta_size + 1,
+                # collision_ves['bbox-2'][i[0]] - delta_size: collision_ves['bbox-5'][i[0]] + delta_size + 1] = labels
+
+                old_label[px + collision_ves['bbox-0'][i[0]] - delta_size,
+                          py + collision_ves['bbox-1'][i[0]] - delta_size,
+                          pz + collision_ves['bbox-2'][i[0]] - delta_size] = collision_ves['bbox-0'][i[0]] + 1000
+                break
+        if is_break == 0:
+            for th in np.arange(0.99, 1, 0.001):
+                # temp=sub_old_label_mask>th
+                temp = sub_old_mask > th
+                labels, nc = skimage.morphology.label(temp, return_num=True, connectivity=None)
+                if nc > pre_nc:
+                    # print(th)
+                    is_break = 1
+                    # print(pre_nc, nc)
+                    px, py, pz = np.where(labels > 0)
+
+                    pxq, pyq, pzq = np.where(~sub_old_label_mask)
+
+                    old_label[pxq + collision_ves['bbox-0'][i[0]] - delta_size,
+                              pyq + collision_ves['bbox-1'][i[0]] - delta_size,
+                              pzq + collision_ves['bbox-2'][i[0]] - delta_size] = 0
+                    # old_label[collision_ves['bbox-0'][i[0]] - delta_size: collision_ves['bbox-3'][i[0]] + delta_size + 1,
+                    # collision_ves['bbox-1'][i[0]] - delta_size: collision_ves['bbox-4'][i[0]] + delta_size + 1,
+                    # collision_ves['bbox-2'][i[0]] - delta_size: collision_ves['bbox-5'][i[0]] + delta_size + 1] = labels
+                    old_label[px + collision_ves['bbox-0'][i[0]] - delta_size,
+                              py + collision_ves['bbox-1'][i[0]] - delta_size,
+                              pz + collision_ves['bbox-2'][i[0]] - delta_size] = collision_ves['bbox-0'][i[0]] + 1000
+                    break
+    #
+    #
+    # pl2.quick_setup(['deep_mask','deep_labels'])
+    old_label = skimage.morphology.label(old_label, connectivity=1)
+    old_label = old_label.astype(np.uint16)
+    return old_label
+
 
 def add_sphere_labels_under_points(image, image_labels, points_to_add,
                                    points_to_add_sizes, minimum_box_size):
