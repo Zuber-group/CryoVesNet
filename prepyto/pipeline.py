@@ -309,6 +309,9 @@ class Pipeline():
         ves_table = prepyto.vesicles_table(deep_labels)
         deep_labels = prepyto.collision_solver(self.deep_mask, deep_labels, ves_table, threshold, delta_size=1)
 
+        ves_table = prepyto.vesicles_table(deep_labels)
+        deep_labels = prepyto.remove_outliers(deep_labels, ves_table, self.min_vol, delta_size=1)
+
         self.deep_labels = deep_labels.astype(np.uint16)
         prepyto.save_label_to_mrc(self.deep_labels, self.deep_labels_path, template_path=self.image_path)
         # free up memory
