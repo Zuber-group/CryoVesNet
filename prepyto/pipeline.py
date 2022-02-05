@@ -102,8 +102,8 @@ class Pipeline():
 
         if self.image_path.exists():
             self.set_array('image')
-        if self.sphere_df_path.exists():
-            self.sphere_df = pd.read_pickle(self.sphere_df_path)
+        # if self.sphere_df_path.exists():
+        #     self.sphere_df = pd.read_pickle(self.sphere_df_path)
 
     def quick_setup(self, labels_to_load=['sphere_labels']):
         self.set_array('image')
@@ -229,7 +229,7 @@ class Pipeline():
         """
         print("Prepyto pipeline: Running unet segmentation if there are less than 7 file in ./deep directory")
         self.prepare_deep(erase_existing=force_run)
-        if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 7 and not force_run:
+        if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 1 and not force_run:
             return
         segseg.full_segmentation(self.network_size, str(self.unet_weight_path.absolute()), self.image_path,
                                  self.deep_dir, rescale=rescale, gauss=True)
@@ -305,6 +305,10 @@ class Pipeline():
                 "The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
             print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
             print(small_labels)
+
+        ves_table = prepyto.vesicles_table(deep_labels)
+        deep_labels = prepyto.collision_solver(self.deep_mask, deep_labels, ves_table, threshold, delta_size=1)
+
         self.deep_labels = deep_labels.astype(np.uint16)
         prepyto.save_label_to_mrc(self.deep_labels, self.deep_labels_path, template_path=self.image_path)
         # free up memory
@@ -329,9 +333,12 @@ class Pipeline():
         if within_segmentation_region:
             self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
         opt_th, _ = segseg.find_threshold(self.image, self.deep_mask)
+        print("why - start")
         image_label_opt = skimage.morphology.label(self.deep_mask > opt_th)
-        _, deep_labels = segseg.mask_clean_up(image_label_opt)
+        deep_labels = image_label_opt
+        # _, deep_labels = segseg.mask_clean_up(image_label_opt)
         self.deep_labels = deep_labels.astype(np.uint16)
+        print("why - end")
         prepyto.save_label_to_mrc(self.deep_labels, self.deep_labels_path, template_path=self.image_path)
         # free up memory
         self.last_output_array_name = 'deep_labels'
@@ -419,8 +426,8 @@ class Pipeline():
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
         sphere_df = prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name))
-        mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center'], axis=1))
-        sphere_df['mahalanobis'] = mahalanobis_series
+        # mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center'], axis=1))
+        # sphere_df['mahalanobis'] = mahalanobis_series
         sphere_df.to_pickle(self.sphere_df_path)
         self.sphere_df = sphere_df
 
@@ -602,6 +609,8 @@ class Pipeline():
         print(f"saved labels to {self.full_labels_path.relative_to(self.dir)}")
 
     def evaluation(self, reference_path=None, prediction_path=None):
+        self.set_array("image")
+        self.set_array("cytomask")
         # if input_array_name == 'last_output_array_name':
         #     input_array_name = self.last_output_array_name
         # self.set_array(input_array_name)
@@ -622,15 +631,17 @@ class Pipeline():
         # real_image = umic.load_raw('./compare/Dummy_80.rec.nad')
         real_image = self.image
         mask = reference.data
+        mask = mask * self.cytomask
         print(np.shape(mask))
         mask = mask >= 10
         corrected_labels = prediction.data
-        corrected_labels_mask = corrected_labels >= 10
+
+        corrected_labels_mask = corrected_labels >= 1
         evaluator = evaluation_class.ConfusionMatrix(corrected_labels_mask, mask)
-        print(evaluator)
+        # print(evaluator)
 
         print("The Pixel Accuracy is: " + str(evaluator.accuracy()))
         print("The  Intersection-Over-Union is: " + str(evaluator.jaccard_index()))
         print("The Dice Metric: " + str(evaluator.dice_metric()))
-        print("Former Dice: " + str(evaluator.former_dice(corrected_labels, mask)))
+        print("Former Dice: " + str(evaluator.former_dice()))
         visualization.viz_labels(self.image, [mask, corrected_labels], ['ground truth', 'New'])
