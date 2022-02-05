@@ -447,6 +447,19 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
+    def repair_spheres(self, memkill = True):
+        self.set_array('cytomask')
+        self.set_array('deep_labels')
+        self.set_array('sphere_labels')
+        deep_labels = self.deep_labels.copy()
+        sphere_labels = self.sphere_labels.copy()
+        print(self.min_vol)
+        temp_best_corrected_labels = prepyto.sround_remover(sphere_labels, self.cytomask,self.min_vol)
+        self.convex_labels = temp_best_corrected_labels
+
+        prepyto.save_label_to_mrc(self.convex_labels, self.convex_labels_path, template_path=self.image_path)
+
+
     def identify_spheres_outliers(self, bins=50, min_mahalanobis_distance=2.0):
         ax = self.sphere_df.mahalanobis.hist(bins=bins, color='blue')
         ylim0, ylim1 = ax.get_ylim()
