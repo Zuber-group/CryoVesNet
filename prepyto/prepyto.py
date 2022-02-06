@@ -13,6 +13,8 @@ from scipy.spatial.distance import mahalanobis
 from tqdm import tqdm
 from . import pipeline
 from pathlib import Path
+import math
+from . import evaluation_class
 
 def get_voxel_size_in_nm(path_to_file):
     with mrcfile.open(path_to_file, header_only=True) as tomo:
@@ -224,6 +226,110 @@ def adjust_shell_intensity(image_int, image_labels):
             best_param = i
             best_mask = mask_adjusted
     return best_param, best_mask  # , mean_shell
+
+def objectwise_evalution(reff, prediction, delta_size=1, proportion=0.0):
+    reff = reff.copy()
+    prediction = prediction.copy()
+    reff_regions = skimage.measure.regionprops_table(reff, properties=('centroid', 'label', 'bbox'))
+    predict_regions = skimage.measure.regionprops_table(prediction, properties=('centroid', 'label', 'bbox'))
+    all = []
+    TP = 0
+    FN = 0
+    print(np.shape(reff))
+    for i in range(0, len(reff_regions['label'])):
+        sub_old_label = reff[
+                        reff_regions['bbox-0'][i] - delta_size: reff_regions['bbox-3'][i] + delta_size + 1,
+                        reff_regions['bbox-1'][i] - delta_size: reff_regions['bbox-4'][i] + delta_size + 1,
+                        reff_regions['bbox-2'][i] - delta_size: reff_regions['bbox-5'][i] + delta_size + 1]
+        sub_new_label = prediction[
+                        reff_regions['bbox-0'][i] - delta_size: reff_regions['bbox-3'][i] + delta_size + 1,
+                        reff_regions['bbox-1'][i] - delta_size: reff_regions['bbox-4'][i] + delta_size + 1,
+                        reff_regions['bbox-2'][i] - delta_size: reff_regions['bbox-5'][i] + delta_size + 1]
+
+        sub_old_label_mask = sub_old_label == reff_regions['label'][i]
+        p = int(round((reff_regions['bbox-3'][i] - reff_regions['bbox-0'][i])))
+        q = int(round((reff_regions['bbox-4'][i] - reff_regions['bbox-1'][i])))
+        r = int(round((reff_regions['bbox-5'][i] - reff_regions['bbox-2'][i])))
+
+        reff_diameter = np.max([p, q, r])
+        px, py, pz = np.where(sub_old_label_mask)
+        areaOfPrediction = sub_new_label[px, py, pz]
+        reff_center = np.array(
+            [reff_regions['centroid-0'][i], reff_regions['centroid-1'][i], reff_regions['centroid-2'][i]])
+        # print(type(areaOfPrediction))
+
+        unique, counts = np.unique(areaOfPrediction, return_counts=True)
+        # print(unique)
+        # print(counts)
+        areaOfPrediction = np.delete(areaOfPrediction, np.where(areaOfPrediction == 0))
+        # (filter(lambda a: a != 2, areaOfPrediction))
+        unique, counts = np.unique(areaOfPrediction, return_counts=True)
+        # print(unique,counts)
+        if len(unique) > 0:
+            if counts[-1] >= proportion * np.count_nonzero(sub_old_label_mask):
+                TP = TP + 1
+                related_label = unique[-1]
+
+                index_related_label = np.where(predict_regions['label'] == related_label)[0][0]
+                # print(related_label,index_related_label)
+                p = int(round(
+                    (predict_regions['bbox-3'][index_related_label] - predict_regions['bbox-0'][index_related_label])))
+                q = int(round(
+                    (predict_regions['bbox-4'][index_related_label] - predict_regions['bbox-1'][index_related_label])))
+                r = int(round(
+                    (predict_regions['bbox-5'][index_related_label] - predict_regions['bbox-2'][index_related_label])))
+
+                predicted_diameter = np.max([p, q, r])
+                predicted_center = np.array([predict_regions['centroid-0'][index_related_label],
+                                             predict_regions['centroid-1'][index_related_label],
+                                             predict_regions['centroid-2'][index_related_label]])
+                a = min(reff_diameter, predicted_diameter)
+                b = max(reff_diameter, predicted_diameter)
+                c = 1 - a / b
+                all += [[reff_regions['label'][i], related_label, reff_diameter, predicted_diameter, c,
+                         math.sqrt(sum((reff_center - predicted_center) ** 2))]]
+                # all+=[abs(reff_center - predicted_center)]
+                # print("Here")
+                # print(reff_center)
+                # print(predicted_center)
+                # print((np.array(reff_center) - np.array(predicted_center)))
+            else:
+                # print(str(reff_regions['label'][i]) + "!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                predicted_diameter = -1
+                predicted_center = reff_center
+                FN = FN + 1
+                qx, qy, qz = np.where(reff == reff_regions['label'][i])
+                reff[qx, qy, qz] = 0
+        else:
+            # print(str(reff_regions['label'][i]) + "!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            predicted_diameter = -1
+            predicted_center = reff_center
+            FN = FN + 1
+            qx, qy, qz = np.where(reff == reff_regions['label'][i])
+            reff[qx, qy, qz] = 0
+        # print(reff_diameter, predicted_diameter)
+        # unique = np.unique(prediction[px, py, pz])
+
+    evaluator = evaluation_class.ConfusionMatrix(reff > 0, prediction > 0)
+    print(evaluator.former_dice())
+    print(len(reff_regions['label']))
+    print(TP)
+    print(FN)
+    tab = np.array(all)
+    # print(np.shape(tab))
+    # print(tab[:, 0])
+    # print(tab[:, 1])
+    # print(tab[:, 2])
+    # print(np.shape(tab[:,0]))
+    # print(ttest_1samp(tab[:,0],0))
+    # # print(tab)
+    # print(np.mean(tab[:,4]))
+    important=[evaluator.former_dice(), len(reff_regions['label']) ,TP, FN, np.mean(tab[:, 4]),np.mean(tab[:, 5]),np.std(tab[:, 5])]
+    # important = [np.mean(tab, axis=0).tolist(), np.std(tab, axis=0).tolist(), ttest_1samp(tab[:, 0], 0),
+    #            ttest_1samp(tab[:, 1], 0), ttest_1samp(tab[:, 2], 0), ttest_ind(tab[:, 0], tab[:, 1]),
+    #             ttest_ind(tab[:, 0], tab[:, 2]), ttest_ind(tab[:, 1], tab[:, 2])]
+    # important = [np.mean(tab, axis=0).tolist(), np.std(tab, axis=0).tolist()]
+    return important
 
 def oneToOneCorrection(old_label, new_label, delta_size=3):
     """
