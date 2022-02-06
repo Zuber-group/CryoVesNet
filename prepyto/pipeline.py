@@ -299,18 +299,22 @@ class Pipeline():
         threshold = threshold_coef * opt_th
 
         deep_labels = skimage.morphology.label(self.deep_mask > threshold)
-        deep_labels, small_labels = prepyto.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol)
-        if len(small_labels):
-            print(
-                "The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
-            print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
-            print(small_labels)
+
 
         ves_table = prepyto.vesicles_table(deep_labels)
         deep_labels = prepyto.collision_solver(self.deep_mask, deep_labels, ves_table, threshold, delta_size=1)
 
         ves_table = prepyto.vesicles_table(deep_labels)
         deep_labels = prepyto.remove_outliers(deep_labels, ves_table, self.min_vol, delta_size=1)
+
+        deep_labels, small_labels = prepyto.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol)
+        if len(small_labels):
+            print(
+                "The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
+            print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
+            print(small_labels)
+            deep_labels[np.isin(deep_labels, small_labels.index)] = 0
+
 
         self.deep_labels = deep_labels.astype(np.uint16)
         prepyto.save_label_to_mrc(self.deep_labels, self.deep_labels_path, template_path=self.image_path)
@@ -661,3 +665,71 @@ class Pipeline():
         print("The Dice Metric: " + str(evaluator.dice_metric()))
         print("Former Dice: " + str(evaluator.former_dice()))
         visualization.viz_labels(self.image, [mask, corrected_labels], ['ground truth', 'New'])
+
+
+
+    def object_evaluation(self, reference_path=None, prediction_path=None):
+        self.set_array("cytomask")
+        self.set_array("deep_mask")
+        self.set_array("sphere_labels")
+        self.set_array("convex_labels")
+
+        # corrected_labels = self.sphere_labels.copy()
+        corrected_labels = self.convex_labels.copy()
+        # self.set_array("sphere_labels")
+        # if input_array_name == 'last_output_array_name':
+        #     input_array_name = self.last_output_array_name
+        # self.set_array(input_array_name)
+        # input_array_name = 'last_output_array_name'
+        if reference_path == None:
+            reference_path = mrc_cleaner.ask_file_path(self.dir, file_extension=('.mrc'))
+            print(reference_path)
+        else:
+            reference_path = self.dir/reference_path
+            print(reference_path)
+
+        # if prediction_path == None:
+        #     prediction_path = mrc_cleaner.ask_file_path(self.save_dir, file_extension=('.mrc'))
+        #     prediction = mrcfile.open(prediction_path)
+        # else:
+        #     prediction_path = mrc_cleaner.ask_file_path(self.dir / prediction_path, file_extension=('.mrc'))
+        #     prediction = mrcfile.open(prediction_path)
+            # prediction = self.last_output_array
+
+
+        reference = mrcfile.open(reference_path)
+        # maskfile = mrcfile.open('./compare/labels_manual.mrc')
+        # corrected = mrcfile.open('./compare/labels_automation.mrc')
+
+        # real_image = umic.load_raw('./compare/Dummy_80.rec.nad')
+        real_image = self.image
+        reff = reference.data
+        reff = reff * self.cytomask
+        print(np.shape(reff))
+        reff = reff >= 10
+
+
+        # corrected_labels = prediction.data
+        # corrected_labels = skimage.morphology.label(corrected_labels, connectivity=1)
+        evaluator1 = evaluation_class.ConfusionMatrix(self.deep_mask, reff)
+        evaluator2 = evaluation_class.ConfusionMatrix(self.sphere_labels >= 1, reff)
+        evaluator3 = evaluation_class.ConfusionMatrix(self.convex_labels >= 1, reff)
+        # print(evaluator)
+
+        print(evaluator1.former_dice())
+        print(evaluator2.former_dice())
+        print(evaluator3.former_dice())
+
+
+        reff = skimage.morphology.label(reff, connectivity=1)
+
+        a=[]
+        a0=[evaluator1.former_dice(),evaluator2.former_dice(),evaluator3.former_dice()]
+        a+=a0
+        for ppp in [0.0]:
+            a1= prepyto.objectwise_evalution(reff,corrected_labels,proportion=ppp)
+            a2 = prepyto.objectwise_evalution(corrected_labels, reff, proportion=ppp)
+            a+=a1
+            a+=a2
+        self.clear_memory()
+        return a

@@ -383,27 +383,27 @@ def remove_labels_under_points(image_label, points_to_remove):
 def expand_small_labels(deep_mask, labels, initial_threshold, min_vol):
     expanded_labels = labels.copy()
     vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area', 'centroid')))
-    small_labels = vesicle_regions[vesicle_regions.area < min_vol * 0.2].set_index('label')
-    step = 0.025
-    for threshold in tqdm(np.arange((initial_threshold-step), 0.8, -step), desc="Expanding labels until none is too small"):
-        labels = skimage.morphology.label(deep_mask>threshold)
-        new_vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area')))
-        new_vesicle_regions.set_index('label', inplace=True)
-        small_labels_fixed = []
-        for label, row in small_labels.iterrows():
-            centroid = (row['centroid-0'],row['centroid-1'],row['centroid-2'])
-            centroid = tuple(np.array(centroid).astype(np.int))
-            new_label = labels[centroid]
-            if (new_label) == 0:
-                pass
-            else:
-                new_vol = new_vesicle_regions.loc[new_label].area
-                if new_vol >= 0.2 * min_vol:
-                    expanded_labels[np.where(labels==new_label)] = label
-                    small_labels_fixed.append(label)
-        small_labels = small_labels.drop(labels=small_labels_fixed)
-        if len(small_labels) == 0 :
-            break
+    small_labels = vesicle_regions[vesicle_regions.area < min_vol * 0.5].set_index('label')
+    # step = 0.025
+    # for threshold in tqdm(np.arange((initial_threshold-step), 0.8, -step), desc="Expanding labels until none is too small"):
+    #     labels = skimage.morphology.label(deep_mask>threshold)
+    #     new_vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area')))
+    #     new_vesicle_regions.set_index('label', inplace=True)
+    #     small_labels_fixed = []
+    #     for label, row in small_labels.iterrows():
+    #         centroid = (row['centroid-0'],row['centroid-1'],row['centroid-2'])
+    #         centroid = tuple(np.array(centroid).astype(np.int))
+    #         new_label = labels[centroid]
+    #         if (new_label) == 0:
+    #             pass
+    #         else:
+    #             new_vol = new_vesicle_regions.loc[new_label].area
+    #             if new_vol >= 0.2 * min_vol:
+    #                 expanded_labels[np.where(labels==new_label)] = label
+    #                 small_labels_fixed.append(label)
+    #     small_labels = small_labels.drop(labels=small_labels_fixed)
+    #     if len(small_labels) == 0 :
+    #         break
     return expanded_labels, small_labels
 
 
@@ -526,7 +526,7 @@ def get_centroids_from_regions(vesicle_regions):
 
 def remove_outliers(deep_labels,ves_table, min_vol ,delta_size = 1):
     new_label = deep_labels.copy()
-    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.2 ) | (ves_table['extent'] > 0.8) ]
+    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.25 ) | (ves_table['extent'] > 0.75) ]
     verysmall_vesicles = verysmall_vesicles.set_index('label')
     print(verysmall_vesicles)
     new_label[np.isin(new_label, verysmall_vesicles.index)] = 0

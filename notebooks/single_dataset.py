@@ -15,7 +15,7 @@ import numpy as np
 
 
 
-dataset_directory = "/mnt/data/amin/treatment3/841/"
+dataset_directory = "/mnt/data/amin/Handpicked/102/"
 # dataset_directory = "/mnt/data/amin/ctrl/10"
 # dataset_directory = "/mnt/data/amin/treatment/10"
 
@@ -29,4 +29,4 @@ pl2.zoom(force_run=True,)
 pl2.label_vesicles_simply(within_segmentation_region = True)
 pl2.make_spheres()
 pl2.repair_spheres()
-pl2.evaluation()
+pl2.object_evaluation()
