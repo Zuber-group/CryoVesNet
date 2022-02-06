@@ -306,7 +306,7 @@ def get_sphere_dataframe(image, image_label, margin=5):
         if keep_label:
             thicknesses.append(thickness)
             densities.append(density)
-            radii.append(new_radius)
+            radii.append(new_radius-1)
             centers.append(new_centroid)
             kept_labels.append(label)
     df = pd.DataFrame(zip(kept_labels, thicknesses, densities, radii, centers),
@@ -526,7 +526,7 @@ def get_centroids_from_regions(vesicle_regions):
 
 def remove_outliers(deep_labels,ves_table, min_vol ,delta_size = 1):
     new_label = deep_labels.copy()
-    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.3 ) | (ves_table['extent'] > 0.7) ]
+    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.2 ) | (ves_table['extent'] > 0.8) ]
     verysmall_vesicles = verysmall_vesicles.set_index('label')
     print(verysmall_vesicles)
     new_label[np.isin(new_label, verysmall_vesicles.index)] = 0
