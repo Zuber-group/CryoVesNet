@@ -632,7 +632,7 @@ def get_centroids_from_regions(vesicle_regions):
 
 def remove_outliers(deep_labels,ves_table, min_vol ,delta_size = 1):
     new_label = deep_labels.copy()
-    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.25 ) | (ves_table['extent'] > 0.75) ]
+    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.2 ) | (ves_table['extent'] > 0.8) ]
     verysmall_vesicles = verysmall_vesicles.set_index('label')
     print(verysmall_vesicles)
     new_label[np.isin(new_label, verysmall_vesicles.index)] = 0

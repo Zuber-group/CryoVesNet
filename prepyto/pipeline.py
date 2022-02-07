@@ -22,6 +22,7 @@ import numpy as np
 import pandas as pd
 import mrcfile
 from tqdm import tqdm
+from scipy.stats import chi2
 from collections.abc import Iterable
 
 try:
@@ -433,8 +434,13 @@ class Pipeline():
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
         sphere_df = prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name))
-        # mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center'], axis=1))
-        # sphere_df['mahalanobis'] = mahalanobis_series
+        mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center'], axis=1))
+        sphere_df['mahalanobis'] = mahalanobis_series
+        print(len(sphere_df))
+        sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], 3)
+        print(sphere_df[sphere_df['p'] <= 0.5])
+        sphere_df = sphere_df[sphere_df['p'] > 0.5]
+        print(len(sphere_df))
         sphere_df.to_pickle(self.sphere_df_path)
         self.sphere_df = sphere_df
 
