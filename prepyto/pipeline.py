@@ -22,7 +22,7 @@ import numpy as np
 import pandas as pd
 import mrcfile
 from tqdm import tqdm
-from scipy.stats import chi2
+from scipy.stats import chi2,pearsonr, spearmanr
 from collections.abc import Iterable
 
 try:
@@ -71,6 +71,7 @@ class Pipeline():
         self.final_vesicle_labels_path = self.save_dir / (self.image_path.stem + '_final_vesicle_labels.mrc')
         self.full_labels_path = self.save_dir / 'labels.mrc'
 
+        self.trash_df= None
         self.image = None  # placeholder for real image array
         self.binned_deep_mask = None  # placeholder for binned_deep_mask
         self.deep_mask = None  # placeholder for unet mask image array
@@ -433,14 +434,30 @@ class Pipeline():
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        sphere_df = prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name))
-        mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center'], axis=1))
+        sphere_df ,radials= prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name))
+        radials=np.array(radials)
+        self.trash_df = radials
+        mu = np.mean(radials, axis=0)
+        corr_s = [spearmanr(x, mu)[0] for x in radials]
+        sphere_df['corr'] = corr_s
+        mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center','corr'], axis=1))
         sphere_df['mahalanobis'] = mahalanobis_series
         print(len(sphere_df))
-        sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], 3)
-        print(sphere_df[sphere_df['p'] <= 0.5])
-        sphere_df = sphere_df[sphere_df['p'] > 0.5]
+        sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], 2)
+        sphere_df['radials'] = radials.tolist()
+        # self.trash_df= sphere_df[sphere_df['mahalanobis'] >=3]
+        sphere_df = sphere_df[sphere_df['mahalanobis'] <3]
+        # sphere_df = sphere_df[sphere_df['corr'] > 0.3]
         print(len(sphere_df))
+
+        # sphere_df["radial"] = radials
+        # mu = np.mean(radials,axis=0)
+        # corr_s= [spearmanr(x, mu)[0] for x in sphere_df["radial"]]
+        # corr_p = [pearsonr(x, mu)[0] for x in sphere_df["radial"]]
+        # sphere_df["corr"] = corr_s
+        # print(len(sphere_df))
+        # sphere_df = sphere_df[sphere_df['corr'] > 0.3]
+        # print(len(sphere_df))
         sphere_df.to_pickle(self.sphere_df_path)
         self.sphere_df = sphere_df
 

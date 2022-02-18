@@ -10,6 +10,7 @@ import os
 import mrcfile
 from scipy import ndimage
 from scipy.spatial.distance import mahalanobis
+from scipy import interpolate
 from tqdm import tqdm
 from . import pipeline
 from pathlib import Path
@@ -402,23 +403,24 @@ def get_sphere_dataframe(image, image_label, margin=5):
     bboxes = get_bboxes_from_regions(vesicle_regions)
     centroids = get_centroids_from_regions(vesicle_regions)
     labels = get_labels_from_regions(vesicle_regions)
-    thicknesses, densities, radii, centers, kept_labels = [],[],[],[],[]
+    thicknesses, densities, radii, centers, kept_labels,my_radial = [],[],[],[],[],[]
     for i in tqdm(range(len(vesicle_regions)), desc="fitting sphere to vesicles"):
         radius = get_label_largest_radius(bboxes[i])  #this is an integer
         rounded_centroid = np.round(centroids[i]).astype(np.int) #this is an array of integers
         label = labels[i]
-        density, keep_label, new_centroid, new_radius, thickness = get_sphere_parameters(image, label, margin, radius,
+        density, keep_label, new_centroid, new_radius, thickness, radial = get_sphere_parameters(image, label, margin, radius,
                                                                                          rounded_centroid)
         if keep_label:
             thicknesses.append(thickness)
             densities.append(density)
-            radii.append(new_radius-1)
+            radii.append(new_radius)
             centers.append(new_centroid)
             kept_labels.append(label)
+            my_radial.append(radial)
     df = pd.DataFrame(zip(kept_labels, thicknesses, densities, radii, centers),
                           columns=['label','thickness','density','radius','center'])
     df = df.set_index('label')
-    return df
+    return df,my_radial
 
 
 def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
@@ -426,18 +428,20 @@ def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
         shift, new_radius = get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=margin)
         new_centroid = (rounded_centroid - shift).astype(np.int)
         image_box = extract_box_of_radius(image, new_centroid, radius + margin)
-        thickness, density = get_sphere_membrane_thickness_and_density_from_image(image_box)
+        thickness, density, radial = get_sphere_membrane_thickness_and_density_from_image(image_box)
         keep_label = True
+
         # if thickness < 6:
         #     print(f"small thickness, label {label}")
     except ValueError:
         print(f"failed, label {label}")
         keep_label = False
+        radial= np.zeros(100)
         thickness = np.nan
         density = np.nan
         new_radius = np.nan
         new_centroid = rounded_centroid
-    return density, keep_label, new_centroid, new_radius, thickness
+    return density, keep_label, new_centroid, new_radius, thickness,radial
 
 
 def mahalanobis_distances(df, axis=0):
@@ -632,7 +636,7 @@ def get_centroids_from_regions(vesicle_regions):
 
 def remove_outliers(deep_labels,ves_table, min_vol ,delta_size = 1):
     new_label = deep_labels.copy()
-    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.2 ) | (ves_table['extent'] > 0.8) ]
+    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.25 ) | (ves_table['extent'] > 0.75) ]
     verysmall_vesicles = verysmall_vesicles.set_index('label')
     print(verysmall_vesicles)
     new_label[np.isin(new_label, verysmall_vesicles.index)] = 0
@@ -647,7 +651,7 @@ def sround_remover(deep_labels,mask,t):
     mask_invert = 1 - (mask)
     extra = deep_labels_temp * mask_invert
     extra_labels , counts= np.unique(extra, return_counts=True)
-    extra_labels = (extra_labels[counts > t/2])
+    extra_labels = (extra_labels[counts > t])
     print(extra_labels)
 
     for i in extra_labels:
@@ -659,6 +663,7 @@ def sround_remover(deep_labels,mask,t):
             deep_labels_temp[px, py, pz] = 0
 
     return deep_labels_temp
+
 
 
 def get_bboxes_from_regions(vesicle_regions):
@@ -923,7 +928,10 @@ def get_sphere_membrane_thickness_and_density_from_radial_profile(radial_profile
 def get_sphere_membrane_thickness_and_density_from_image(image):
     radial_profile = get_radial_profile(image)
     thickness, density = get_sphere_membrane_thickness_and_density_from_radial_profile(radial_profile)
-    return thickness, density
+    d = interpolate.interp1d(np.arange(len(radial_profile)),radial_profile)
+    xnew = np.arange(0, len(radial_profile)-1, (len(radial_profile)-0.9999999999) / 100)
+    ynew = d(xnew)
+    return thickness, density,ynew
 
 def get_optimal_sphere_radius_from_image(image):
     radial_profile = get_radial_profile(image)
