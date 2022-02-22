@@ -16,6 +16,9 @@ from . import pipeline
 from pathlib import Path
 import math
 from . import evaluation_class
+from scipy.spatial import distance_matrix
+
+
 
 def get_voxel_size_in_nm(path_to_file):
     with mrcfile.open(path_to_file, header_only=True) as tomo:
@@ -44,9 +47,9 @@ def save_label_to_mrc(labels,path_to_file,template_path=None):
         if template_path:
             template = mrcfile.open(template_path, header_only=True)
             #for a reason that is not understood, origin needs to be inverted
-            mrc.header['origin'].x = template.header['origin'].x * -1
-            mrc.header['origin'].y = template.header['origin'].y * -1
-            mrc.header['origin'].z = template.header['origin'].z * -1
+            mrc.header['origin'].x = template.header['origin'].x * 1
+            mrc.header['origin'].y = template.header['origin'].y * 1
+            mrc.header['origin'].z = template.header['origin'].z * 1
             mrc.voxel_size = template.voxel_size
     return path_to_file
 
@@ -395,7 +398,7 @@ def oneToOneCorrection(old_label, new_label, delta_size=3):
     best_corrected_labels = best_corrected_labels.astype(np.uint16)
     return best_corrected_labels
 
-def get_sphere_dataframe(image, image_label, margin=5):
+def get_sphere_dataframe(image, image_label, margin=5,r=0):
     corrected_labels = np.zeros(image_label.shape, dtype=int)
     image_bounding_box = get_image_bounding_box(image_label)
     vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(image_label,
@@ -413,7 +416,7 @@ def get_sphere_dataframe(image, image_label, margin=5):
         if keep_label:
             thicknesses.append(thickness)
             densities.append(density)
-            radii.append(new_radius)
+            radii.append(new_radius+r)
             centers.append(new_centroid)
             kept_labels.append(label)
             my_radial.append(radial)
@@ -645,26 +648,43 @@ def remove_outliers(deep_labels,ves_table, min_vol ,delta_size = 1):
 
 
 
-def sround_remover(deep_labels,mask,t):
+def surround_remover(deep_labels,mask,t):
     mask = mask.copy()
     deep_labels_temp = deep_labels.copy()
     mask_invert = 1 - (mask)
     extra = deep_labels_temp * mask_invert
     extra_labels , counts= np.unique(extra, return_counts=True)
-    extra_labels = (extra_labels[counts > t])
+    extra_labels = (extra_labels[counts > t/2])
+    extra_labels = extra_labels.tolist()
+    extra_labels.remove(0)
     print(extra_labels)
 
-    for i in extra_labels:
-        if i == 0:
-            pass
-        else:
+    # for i in extra_labels:
+    #     if i == 0:
+    #         pass
+    #     else:
+    #
+    #         px, py, pz = np.where(deep_labels== i)
+    #         deep_labels_temp[px, py, pz] = 0
 
-            px, py, pz = np.where(deep_labels== i)
-            deep_labels_temp[px, py, pz] = 0
-
-    return deep_labels_temp
+    return extra_labels
 
 
+
+def adjacent_vesicles(sphere_df):
+    new_radii = sphere_df["radius"].values
+    new_centroids = sphere_df["center"].values
+    new_centroids = new_centroids.tolist()
+    new_centroids_arr = [x.tolist() for x in new_centroids]
+    new_centroids = np.array(new_centroids_arr)
+    rm = np.repeat(np.array((new_radii,)), len(new_radii), axis=0)
+    radii_matrix = rm + rm.T
+    dm = distance_matrix(new_centroids, new_centroids)
+    maxvalue = np.finfo(dm.dtype).max
+    for i in range(len(dm)):
+        dm[i, i] = maxvalue
+    collisions = np.array((np.where(dm <= radii_matrix)))
+    return collisions.T
 
 def get_bboxes_from_regions(vesicle_regions):
     bboxes = []

@@ -1,3 +1,4 @@
+import math
 import os
 import platform
 import sys
@@ -90,7 +91,7 @@ class Pipeline():
                                   'active_zone_mask', 'deep_labels',
                                   'threshold_tuned_labels', 'convex_labels', 'mancorr_labels', 'sphere_labels',
                                   'no_small_labels', 'final_vesicle_labels'}
-        self.vesicle_mod_path = self.dir / 'vesicles.mod'
+        self.vesicle_mod_path = self.save_dir / 'vesicles.mod'
         self.active_zone_mod_path = self.dir / 'active_zone.mod'
         self.cell_outline_mod_path = self.dir / 'cell_outline.mod'
         self.full_mod_path = self.save_dir / 'full_prepyto.mod'
@@ -430,11 +431,11 @@ class Pipeline():
             self.clear_memory(exclude=self.last_output_array_name)
         self.print_output_info()
 
-    def compute_sphere_dataframe(self, input_array_name='last_output_array_name'):
+    def compute_sphere_dataframe(self, input_array_name='last_output_array_name',r=0):
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        sphere_df ,radials= prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name))
+        sphere_df ,radials= prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name),r)
         radials=np.array(radials)
         self.trash_df = radials
         mu = np.mean(radials, axis=0)
@@ -461,12 +462,12 @@ class Pipeline():
         sphere_df.to_pickle(self.sphere_df_path)
         self.sphere_df = sphere_df
 
-    def make_spheres(self, input_array_name='last_output_array_name', memkill=True):
+    def make_spheres(self, input_array_name='last_output_array_name', memkill=True,r=0):
         print("Prepyto Pipeline: Making vesicles spherical.")
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        self.compute_sphere_dataframe(input_array_name)
+        self.compute_sphere_dataframe(input_array_name,r)
         self.sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(getattr(self, input_array_name), self.sphere_df)
         prepyto.save_label_to_mrc(self.sphere_labels, self.sphere_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'sphere_labels'
@@ -474,17 +475,56 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
-    def repair_spheres(self, memkill = True):
+    def repair_spheres(self,memkill = True):
         self.set_array('cytomask')
         self.set_array('deep_labels')
         self.set_array('sphere_labels')
-        deep_labels = self.deep_labels.copy()
+        # deep_labels = self.deep_labels.copy()
         sphere_labels = self.sphere_labels.copy()
         print(self.min_vol)
-        temp_best_corrected_labels = prepyto.sround_remover(sphere_labels, self.cytomask,self.min_vol)
-        self.convex_labels = temp_best_corrected_labels
+        surround_labels = prepyto.surround_remover(sphere_labels, self.cytomask,self.min_vol)
+        sphere_df= pd.read_pickle(self.sphere_df_path)
+        sphere_df.drop(surround_labels)
+        temp=prepyto.adjacent_vesicles(sphere_df)
+        edited=[]
+        # print(temp)
+        while(len(temp)>0):
+            print("#############################################################################")
+            print(temp)
+            for x in temp:
+                # print(x)
+                # print("e",edited)
+                if x[0] not in edited and x[1] not in edited:
+                    # print(x)
+                    p = x[0]
+                    q = x[1]
+                    r1=sphere_df['radius'].iloc[p]
+                    r2=sphere_df['radius'].iloc[q]
+                    c1 = sphere_df['center'].iloc[p]
+                    c2 = sphere_df['center'].iloc[q]
+                    r3= r1+r2
+                    d=math.ceil(math.sqrt(sum((c1-c2)**2)))
+                    new_r1=math.floor(d*(r1/r3))-1
+                    new_r2 = math.floor(d * (r2 / r3))-1
+                    print(sphere_df.iloc[p])
+                    sphere_df.iat[p,2]=int(new_r1)
+                    print(sphere_df.iloc[p])
+                    sphere_df.iat[q,2]=int(new_r2)
+                    print(r1,new_r1,r2,new_r2,d)
+                    edited.append(p)
+                    edited.append(q)
+                    # temp = np.delete(temp,np.where(temp==x))
+                    # temp = np.delete(temp,np.where(temp==[q,p]))
+            temp = prepyto.adjacent_vesicles(sphere_df)
+            edited = []
+        print(temp)
 
+
+
+        # self.convex_labels = temp_best_corrected_labels
+        self.convex_labels = prepyto.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
         prepyto.save_label_to_mrc(self.convex_labels, self.convex_labels_path, template_path=self.image_path)
+        self.last_output_array_name = 'convex_labels'
 
 
     def identify_spheres_outliers(self, bins=50, min_mahalanobis_distance=2.0):
@@ -595,10 +635,12 @@ class Pipeline():
                                   template_path=self.image_path)
         self.last_output_array_name = 'final_vesicle_labels'
         self.print_output_info()
-        cmd0 = f"imodauto -f 3 -m 1 -h 0 \"{self.final_vesicle_labels_path}\" \"{self.full_mod_path}\""
-        cmd1 = f"imodjoin -c \"{self.cell_outline_mod_path}\" \"{self.active_zone_mod_path}\" \"{self.full_mod_path}\" \"{self.full_mod_path}\""
+        cmd0 = f"imodauto -f 3 -m 4 -h 0 -O 10 \"{self.final_vesicle_labels_path}\" \"{self.vesicle_mod_path}\""
+        cmd1 = f"imodjoin -c \"{self.cell_outline_mod_path}\" \"{self.active_zone_mod_path}\" \"{self.vesicle_mod_path}\" \"{self.full_mod_path}\""
         os.system(cmd0)
+        print("next:")
         os.system(cmd1)
+        # os.system("imodjoin -c full_prepyto.mod vesicles.mod full_prepyto.mod")
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         print(f"full model file saved to {self.full_mod_path.relative_to(self.dir)}")
