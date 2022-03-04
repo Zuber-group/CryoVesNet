@@ -34,7 +34,7 @@ def min_volume_of_vesicle(voxel_size, radius_thr = 12):
     volume_of_vesicle = (4.0 / 3.0) * np.pi * (radius) ** 3
     return volume_of_vesicle
 
-def save_label_to_mrc(labels,path_to_file,template_path=None):
+def save_label_to_mrc(labels,path_to_file,template_path=None,q = 1):
     """
     using pathlib.Path, there is no need to do these complicated string operations
     hence BZ changed input parameters to only labels and output path.
@@ -47,9 +47,9 @@ def save_label_to_mrc(labels,path_to_file,template_path=None):
         if template_path:
             template = mrcfile.open(template_path, header_only=True)
             #for a reason that is not understood, origin needs to be inverted
-            mrc.header['origin'].x = template.header['origin'].x * 1
-            mrc.header['origin'].y = template.header['origin'].y * 1
-            mrc.header['origin'].z = template.header['origin'].z * 1
+            mrc.header['origin'].x = template.header['origin'].x * q
+            mrc.header['origin'].y = template.header['origin'].y * q
+            mrc.header['origin'].z = template.header['origin'].z * q
             mrc.voxel_size = template.voxel_size
     return path_to_file
 
@@ -428,16 +428,26 @@ def get_sphere_dataframe(image, image_label, margin=5,r=0):
 
 def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
     try:
-        shift, new_radius = get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=margin)
-        new_centroid = (rounded_centroid - shift).astype(np.int)
-        image_box = extract_box_of_radius(image, new_centroid, radius + margin)
-        thickness, density, radial = get_sphere_membrane_thickness_and_density_from_image(image_box)
-        keep_label = True
+        if label not in  [72]:
+            shift, new_radius = get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=margin)
+            new_centroid = (rounded_centroid - shift).astype(np.int)
+            image_box = extract_box_of_radius(image, new_centroid, radius + margin)
+            thickness, density, radial = get_sphere_membrane_thickness_and_density_from_image(image_box)
+            keep_label = True
+        else:
+
+            keep_label = False
+            radial = np.zeros(100)
+            thickness = np.nan
+            density = np.nan
+            new_radius = np.nan
+            new_centroid = rounded_centroid
 
         # if thickness < 6:
         #     print(f"small thickness, label {label}")
     except ValueError:
-        print(f"failed, label {label}")
+    # else:
+
         keep_label = False
         radial= np.zeros(100)
         thickness = np.nan

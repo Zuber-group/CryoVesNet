@@ -92,7 +92,7 @@ class Pipeline():
                                   'threshold_tuned_labels', 'convex_labels', 'mancorr_labels', 'sphere_labels',
                                   'no_small_labels', 'final_vesicle_labels'}
         self.vesicle_mod_path = self.save_dir / 'vesicles.mod'
-        self.active_zone_mod_path = self.dir / 'active_zone.mod'
+        self.active_zone_mod_path = self.dir / 'az.mod'
         self.cell_outline_mod_path = self.dir / 'cell_outline.mod'
         self.full_mod_path = self.save_dir / 'full_prepyto.mod'
         with pkg_resources.path(weights, 'weights.h5') as p:
@@ -134,7 +134,7 @@ class Pipeline():
 
     def set_segmentation_region_from_mod(self, datatype=np.uint8, force_generate=False):
         if (not self.cytomask_path.exists()) or force_generate:
-            cmd = f"imodmop -mode 6 -o 1 -mask 1 \"{self.cell_outline_mod_path}\" \"{self.image_path}\" \"{self.cytomask_path}\""
+            cmd = f"imodmop -mode 6 -o 9 -mask 1 \"{self.cell_outline_mod_path}\" \"{self.image_path}\" \"{self.cytomask_path}\""
             os.system(cmd)
         self.set_array('cytomask', datatype=datatype)
 
@@ -447,7 +447,7 @@ class Pipeline():
         sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], 2)
         sphere_df['radials'] = radials.tolist()
         # self.trash_df= sphere_df[sphere_df['mahalanobis'] >=3]
-        sphere_df = sphere_df[sphere_df['mahalanobis'] <3]
+        sphere_df = sphere_df[sphere_df['mahalanobis'] <4]
         # sphere_df = sphere_df[sphere_df['corr'] > 0.3]
         print(len(sphere_df))
 
@@ -523,6 +523,7 @@ class Pipeline():
 
         # self.convex_labels = temp_best_corrected_labels
         self.convex_labels = prepyto.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
+        print(len(sphere_df))
         prepyto.save_label_to_mrc(self.convex_labels, self.convex_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'convex_labels'
 
@@ -617,7 +618,7 @@ class Pipeline():
         with pkg_resources.path(pyto_scripts, '.') as src:
             shutil.copytree(src, self.pyto_dir)
 
-    def make_full_modfile(self, input_array_name='last_output_array_name', do_rearrange_labels=True, memkill=True):
+    def make_full_modfile(self, input_array_name='last_output_array_name', do_rearrange_labels=True, memkill=True, q=1):
         """
         convert the vesicle label file to a modfile and merge it with the initial modfile
         do_rearrange_labels: if True, then no empty label in the input labels array are left
@@ -632,7 +633,7 @@ class Pipeline():
         else:
             self.final_vesicle_labels = getattr(self, input_array_name)
         prepyto.save_label_to_mrc(self.final_vesicle_labels, self.final_vesicle_labels_path,
-                                  template_path=self.image_path)
+                                  template_path=self.image_path, q=q)
         self.last_output_array_name = 'final_vesicle_labels'
         self.print_output_info()
         cmd0 = f"imodauto -f 3 -m 4 -h 0 -O 10 \"{self.final_vesicle_labels_path}\" \"{self.vesicle_mod_path}\""
@@ -655,7 +656,7 @@ class Pipeline():
                              additional_non_vesicle_object_modpath=None,
                              handpicked_vesicles_objects=[],
                              hand_picked_vesicles_modpath=None,
-                             first_vesicle_index=10, memkill=True):
+                             first_vesicle_index=10, memkill=True,q=1):
         """
         Assemble full label file from masks and full mod file
         :return:
@@ -688,7 +689,7 @@ class Pipeline():
             offset = self.full_labels.max()
             handpicked_indices = handpicked_array.nonzero()
             self.full_labels[handpicked_indices] = handpicked_array[handpicked_indices] + offset
-        prepyto.save_label_to_mrc(self.full_labels, self.full_labels_path, template_path=self.image_path)
+        prepyto.save_label_to_mrc(self.full_labels, self.full_labels_path, template_path=self.image_path, q=q)
         if memkill:
             self.clear_memory()
         print(f"saved labels to {self.full_labels_path.relative_to(self.dir)}")
