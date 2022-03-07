@@ -73,6 +73,7 @@ class Pipeline():
         self.full_labels_path = self.save_dir / 'labels.mrc'
 
         self.trash_df= None
+        self.radials = None
         self.image = None  # placeholder for real image array
         self.binned_deep_mask = None  # placeholder for binned_deep_mask
         self.deep_mask = None  # placeholder for unet mask image array
@@ -134,7 +135,7 @@ class Pipeline():
 
     def set_segmentation_region_from_mod(self, datatype=np.uint8, force_generate=False):
         if (not self.cytomask_path.exists()) or force_generate:
-            cmd = f"imodmop -mode 6 -o 9 -mask 1 \"{self.cell_outline_mod_path}\" \"{self.image_path}\" \"{self.cytomask_path}\""
+            cmd = f"imodmop -mode 6 -o 1 -mask 1 \"{self.cell_outline_mod_path}\" \"{self.image_path}\" \"{self.cytomask_path}\""
             os.system(cmd)
         self.set_array('cytomask', datatype=datatype)
 
@@ -431,13 +432,13 @@ class Pipeline():
             self.clear_memory(exclude=self.last_output_array_name)
         self.print_output_info()
 
-    def compute_sphere_dataframe(self, input_array_name='last_output_array_name',r=0):
+    def compute_sphere_dataframe(self, input_array_name='last_output_array_name'):
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        sphere_df ,radials= prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name),r)
+        sphere_df ,radials= prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name))
         radials=np.array(radials)
-        self.trash_df = radials
+        self.radials = radials
         mu = np.mean(radials, axis=0)
         corr_s = [spearmanr(x, mu)[0] for x in radials]
         sphere_df['corr'] = corr_s
@@ -446,8 +447,8 @@ class Pipeline():
         print(len(sphere_df))
         sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], 2)
         sphere_df['radials'] = radials.tolist()
-        # self.trash_df= sphere_df[sphere_df['mahalanobis'] >=3]
-        sphere_df = sphere_df[sphere_df['mahalanobis'] <4]
+        # self.trash_df= sphere_df[sphere_df['mahalanobis'] >= m]
+        # sphere_df = sphere_df[sphere_df['mahalanobis'] <m]
         # sphere_df = sphere_df[sphere_df['corr'] > 0.3]
         print(len(sphere_df))
 
@@ -462,12 +463,12 @@ class Pipeline():
         sphere_df.to_pickle(self.sphere_df_path)
         self.sphere_df = sphere_df
 
-    def make_spheres(self, input_array_name='last_output_array_name', memkill=True,r=0):
+    def make_spheres(self, input_array_name='last_output_array_name', memkill=True):
         print("Prepyto Pipeline: Making vesicles spherical.")
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        self.compute_sphere_dataframe(input_array_name,r)
+        self.compute_sphere_dataframe(input_array_name)
         self.sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(getattr(self, input_array_name), self.sphere_df)
         prepyto.save_label_to_mrc(self.sphere_labels, self.sphere_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'sphere_labels'
@@ -475,16 +476,24 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
-    def repair_spheres(self,memkill = True):
+    def repair_spheres(self,memkill = True, m=4,r=0):
         self.set_array('cytomask')
         self.set_array('deep_labels')
         self.set_array('sphere_labels')
         # deep_labels = self.deep_labels.copy()
         sphere_labels = self.sphere_labels.copy()
         print(self.min_vol)
-        surround_labels = prepyto.surround_remover(sphere_labels, self.cytomask,self.min_vol)
+
+        surround_labels = prepyto.surround_remover(sphere_labels, self.cytomask, self.min_vol)
+
         sphere_df= pd.read_pickle(self.sphere_df_path)
         sphere_df.drop(surround_labels)
+
+        sphere_df['radius'] = sphere_df['radius'] + r
+        sphere_df = sphere_df[sphere_df['mahalanobis'] < m]
+
+
+
         temp=prepyto.adjacent_vesicles(sphere_df)
         edited=[]
         # print(temp)

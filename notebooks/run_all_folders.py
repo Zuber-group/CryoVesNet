@@ -3,7 +3,7 @@ import warnings
 import os
 warnings.filterwarnings("ignore")
 os.environ["TF_CPP_MIN_LOG_LEVEL"]="2"
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+os.environ["CUDA_VISIBLE_DEVICES"]="2"
 
 import prepyto
 
@@ -16,7 +16,7 @@ import numpy as np
 
 
 dataset_directory = "/mnt/data/amin/Handpicked/"
-# dataset_directory = "/mnt/data/amin/ctrl/"
+dataset_directory = "/mnt/data/amin/ctrl/"
 # dataset_directory = "/mnt/data/amin/treatment/"
 # dataset_directory = "/mnt/data/amin/bad/"
 # dataset_directory = "
@@ -28,15 +28,15 @@ def my_function(directory):
     pl.network_size = 64
     pl.setup_prepyto_dir()
 
-    pl.run_deep(force_run=True, rescale=0.5)
+    pl.run_deep(force_run=True, rescale=1.0)
     pl.zoom(force_run=True, )
     pl.label_vesicles_simply(within_segmentation_region = True)
     pl.make_spheres()
     pl.repair_spheres()
     pl.clear_memory()
     res=pl.object_evaluation(reference_path='labels_out.mrc')
-    pl.make_full_modfile(input_array_name='convex_labels')
-    pl.make_full_label_file()
+    # pl.make_full_modfile(input_array_name='convex_labels')
+    # pl.make_full_label_file()
     return res
 
 

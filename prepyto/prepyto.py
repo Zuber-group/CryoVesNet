@@ -398,7 +398,7 @@ def oneToOneCorrection(old_label, new_label, delta_size=3):
     best_corrected_labels = best_corrected_labels.astype(np.uint16)
     return best_corrected_labels
 
-def get_sphere_dataframe(image, image_label, margin=5,r=0):
+def get_sphere_dataframe(image, image_label, margin=5):
     corrected_labels = np.zeros(image_label.shape, dtype=int)
     image_bounding_box = get_image_bounding_box(image_label)
     vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(image_label,
@@ -416,7 +416,7 @@ def get_sphere_dataframe(image, image_label, margin=5,r=0):
         if keep_label:
             thicknesses.append(thickness)
             densities.append(density)
-            radii.append(new_radius+r)
+            radii.append(new_radius)
             centers.append(new_centroid)
             kept_labels.append(label)
             my_radial.append(radial)
@@ -664,7 +664,7 @@ def surround_remover(deep_labels,mask,t):
     mask_invert = 1 - (mask)
     extra = deep_labels_temp * mask_invert
     extra_labels , counts= np.unique(extra, return_counts=True)
-    extra_labels = (extra_labels[counts > t/2])
+    extra_labels = (extra_labels[counts > t])
     extra_labels = extra_labels.tolist()
     extra_labels.remove(0)
     print(extra_labels)
