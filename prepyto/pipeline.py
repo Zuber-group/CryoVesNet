@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 import mrcfile
 from tqdm import tqdm
-from scipy.stats import chi2,pearsonr, spearmanr
+from scipy.stats import chi2, pearsonr, spearmanr
 from collections.abc import Iterable
 
 try:
@@ -63,6 +63,7 @@ class Pipeline():
         self.cytomask_path = self.save_dir / (self.image_path.stem + '_cytomask.mrc')
         self.active_zone_mask_path = self.save_dir / (self.image_path.stem + '_azmask.mrc')
         self.deep_labels_path = self.save_dir / (self.image_path.stem + '_deep_labels.mrc')
+        self.clean_deep_labels_path = self.save_dir / (self.image_path.stem + '_clean_deep_labels.mrc')
         self.threshold_tuned_labels_path = self.save_dir / (self.image_path.stem + '_intensity_corrected_labels.mrc')
         self.convex_labels_path = self.save_dir / (self.image_path.stem + '_convex_labels.mrc')
         self.mancorr_labels_path = self.save_dir / (self.image_path.stem + '_mancorr.mrc')
@@ -72,7 +73,7 @@ class Pipeline():
         self.final_vesicle_labels_path = self.save_dir / (self.image_path.stem + '_final_vesicle_labels.mrc')
         self.full_labels_path = self.save_dir / 'labels.mrc'
 
-        self.trash_df= None
+        self.trash_df = None
         self.radials = None
         self.image = None  # placeholder for real image array
         self.binned_deep_mask = None  # placeholder for binned_deep_mask
@@ -80,6 +81,7 @@ class Pipeline():
         self.deep_winners_mask = None
         self.cytomask = None
         self.active_zone_mask = None
+        self.clean_deep_labels = None
         self.deep_labels = None  # placeholder for cleaned label array
         self.threshold_tuned_labels = None  # placeholder for threshold tuned label array
         self.convex_labels = None
@@ -89,7 +91,7 @@ class Pipeline():
         self.final_vesicle_labels = None
         self.full_labels = None
         self.garbage_collector = {'image', 'binned_deep_mask', 'deep_mask', 'cytomask',
-                                  'active_zone_mask', 'deep_labels',
+                                  'active_zone_mask', 'deep_labels','clean_deep_labels',
                                   'threshold_tuned_labels', 'convex_labels', 'mancorr_labels', 'sphere_labels',
                                   'no_small_labels', 'final_vesicle_labels'}
         self.vesicle_mod_path = self.save_dir / 'vesicles.mod'
@@ -304,7 +306,6 @@ class Pipeline():
 
         deep_labels = skimage.morphology.label(self.deep_mask > threshold)
 
-
         ves_table = prepyto.vesicles_table(deep_labels)
         deep_labels = prepyto.collision_solver(self.deep_mask, deep_labels, ves_table, threshold, delta_size=1)
 
@@ -319,11 +320,10 @@ class Pipeline():
             print(small_labels)
             deep_labels[np.isin(deep_labels, small_labels.index)] = 0
 
-
-        self.deep_labels = deep_labels.astype(np.uint16)
-        prepyto.save_label_to_mrc(self.deep_labels, self.deep_labels_path, template_path=self.image_path)
+        self.clean_deep_labels = deep_labels.astype(np.uint16)
+        prepyto.save_label_to_mrc(self.clean_deep_labels, self.clean_deep_labels_path, template_path=self.image_path)
         # free up memory
-        self.last_output_array_name = 'deep_labels'
+        self.last_output_array_name = 'clean_deep_labels'
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
@@ -436,13 +436,13 @@ class Pipeline():
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        sphere_df ,radials= prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name))
-        radials=np.array(radials)
+        sphere_df, radials = prepyto.get_sphere_dataframe(self.image, getattr(self, input_array_name))
+        radials = np.array(radials)
         self.radials = radials
         mu = np.mean(radials, axis=0)
         corr_s = [spearmanr(x, mu)[0] for x in radials]
         sphere_df['corr'] = corr_s
-        mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center','corr'], axis=1))
+        mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center', 'corr'], axis=1))
         sphere_df['mahalanobis'] = mahalanobis_series
         print(len(sphere_df))
         sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], 2)
@@ -476,28 +476,25 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
-    def repair_spheres(self,memkill = True, m=4,r=0):
+    def repair_spheres(self, memkill=True, m=4, r=0):
         self.set_array('cytomask')
-        self.set_array('deep_labels')
         self.set_array('sphere_labels')
         # deep_labels = self.deep_labels.copy()
         sphere_labels = self.sphere_labels.copy()
         print(self.min_vol)
 
-        surround_labels = prepyto.surround_remover(sphere_labels, self.cytomask, self.min_vol)
-
-        sphere_df= pd.read_pickle(self.sphere_df_path)
-        sphere_df.drop(surround_labels)
-
+        sphere_df = pd.read_pickle(self.sphere_df_path)
         sphere_df['radius'] = sphere_df['radius'] + r
         sphere_df = sphere_df[sphere_df['mahalanobis'] < m]
+        sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
 
+        surround_labels = prepyto.surround_remover(sphere_labels, self.cytomask, self.min_vol)
+        sphere_df.drop(surround_labels)
 
-
-        temp=prepyto.adjacent_vesicles(sphere_df)
-        edited=[]
+        temp = prepyto.adjacent_vesicles(sphere_df)
+        edited = []
         # print(temp)
-        while(len(temp)>0):
+        while (len(temp) > 0):
             print("#############################################################################")
             print(temp)
             for x in temp:
@@ -507,19 +504,19 @@ class Pipeline():
                     # print(x)
                     p = x[0]
                     q = x[1]
-                    r1=sphere_df['radius'].iloc[p]
-                    r2=sphere_df['radius'].iloc[q]
+                    r1 = sphere_df['radius'].iloc[p]
+                    r2 = sphere_df['radius'].iloc[q]
                     c1 = sphere_df['center'].iloc[p]
                     c2 = sphere_df['center'].iloc[q]
-                    r3= r1+r2
-                    d=math.ceil(math.sqrt(sum((c1-c2)**2)))
-                    new_r1=math.floor(d*(r1/r3))-1
-                    new_r2 = math.floor(d * (r2 / r3))-1
+                    r3 = r1 + r2
+                    d = math.ceil(math.sqrt(sum((c1 - c2) ** 2)))
+                    new_r1 = math.floor(d * (r1 / r3)) - 1
+                    new_r2 = math.floor(d * (r2 / r3)) - 1
                     print(sphere_df.iloc[p])
-                    sphere_df.iat[p,2]=int(new_r1)
+                    sphere_df.iat[p, 2] = int(new_r1)
                     print(sphere_df.iloc[p])
-                    sphere_df.iat[q,2]=int(new_r2)
-                    print(r1,new_r1,r2,new_r2,d)
+                    sphere_df.iat[q, 2] = int(new_r2)
+                    print(r1, new_r1, r2, new_r2, d)
                     edited.append(p)
                     edited.append(q)
                     # temp = np.delete(temp,np.where(temp==x))
@@ -528,14 +525,11 @@ class Pipeline():
             edited = []
         print(temp)
 
-
-
         # self.convex_labels = temp_best_corrected_labels
         self.convex_labels = prepyto.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
         print(len(sphere_df))
         prepyto.save_label_to_mrc(self.convex_labels, self.convex_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'convex_labels'
-
 
     def identify_spheres_outliers(self, bins=50, min_mahalanobis_distance=2.0):
         ax = self.sphere_df.mahalanobis.hist(bins=bins, color='blue')
@@ -665,7 +659,7 @@ class Pipeline():
                              additional_non_vesicle_object_modpath=None,
                              handpicked_vesicles_objects=[],
                              hand_picked_vesicles_modpath=None,
-                             first_vesicle_index=10, memkill=True,q=1):
+                             first_vesicle_index=10, memkill=True, q=1):
         """
         Assemble full label file from masks and full mod file
         :return:
@@ -741,11 +735,11 @@ class Pipeline():
         print("Former Dice: " + str(evaluator.former_dice()))
         visualization.viz_labels(self.image, [mask, corrected_labels], ['ground truth', 'New'])
 
-
-
     def object_evaluation(self, reference_path=None, prediction_path=None):
         self.set_array("cytomask")
         self.set_array("deep_mask")
+        self.set_array("deep_labels")
+        self.set_array("clean_deep_labels")
         self.set_array("sphere_labels")
         self.set_array("convex_labels")
 
@@ -760,7 +754,7 @@ class Pipeline():
             reference_path = mrc_cleaner.ask_file_path(self.dir, file_extension=('.mrc'))
             print(reference_path)
         else:
-            reference_path = self.dir/reference_path
+            reference_path = self.dir / reference_path
             print(reference_path)
 
         # if prediction_path == None:
@@ -769,8 +763,7 @@ class Pipeline():
         # else:
         #     prediction_path = mrc_cleaner.ask_file_path(self.dir / prediction_path, file_extension=('.mrc'))
         #     prediction = mrcfile.open(prediction_path)
-            # prediction = self.last_output_array
-
+        # prediction = self.last_output_array
 
         reference = mrcfile.open(reference_path)
         # maskfile = mrcfile.open('./compare/labels_manual.mrc')
@@ -783,28 +776,30 @@ class Pipeline():
         print(np.shape(reff))
         reff = reff >= 10
 
-
         # corrected_labels = prediction.data
         # corrected_labels = skimage.morphology.label(corrected_labels, connectivity=1)
         evaluator1 = evaluation_class.ConfusionMatrix(self.deep_mask, reff)
-        evaluator2 = evaluation_class.ConfusionMatrix(self.sphere_labels >= 1, reff)
-        evaluator3 = evaluation_class.ConfusionMatrix(self.convex_labels >= 1, reff)
+        evaluator2 = evaluation_class.ConfusionMatrix(self.deep_labels >= 1, reff)
+        evaluator3 = evaluation_class.ConfusionMatrix(self.clean_deep_labels >= 1, reff)
+        evaluator4 = evaluation_class.ConfusionMatrix(self.sphere_labels >= 1, reff)
+        evaluator5 = evaluation_class.ConfusionMatrix(self.convex_labels >= 1, reff)
         # print(evaluator)
 
         print(evaluator1.former_dice())
         print(evaluator2.former_dice())
         print(evaluator3.former_dice())
-
+        print(evaluator4.former_dice())
+        print(evaluator5.former_dice())
 
         reff = skimage.morphology.label(reff, connectivity=1)
 
-        a=[]
-        a0=[evaluator1.former_dice(),evaluator2.former_dice(),evaluator3.former_dice()]
-        a+=a0
+        a = []
+        a0 = [evaluator1.former_dice(), evaluator2.former_dice(), evaluator3.former_dice(), evaluator4.former_dice(), evaluator5.former_dice()]
+        a += a0
         for ppp in [0.0]:
-            a1= prepyto.objectwise_evalution(reff,corrected_labels,proportion=ppp)
+            a1 = prepyto.objectwise_evalution(reff, corrected_labels, proportion=ppp)
             a2 = prepyto.objectwise_evalution(corrected_labels, reff, proportion=ppp)
-            a+=a1
-            a+=a2
+            a += a1
+            a += a2
         self.clear_memory()
         return a
