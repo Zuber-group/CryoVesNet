@@ -503,30 +503,60 @@ def remove_labels_under_points(image_label, points_to_remove):
     corrected_labels[selection_mask] = 0
     return corrected_labels
 
-def expand_small_labels(deep_mask, labels, initial_threshold, min_vol):
+def expand_all_small_labels(deep_mask, labels, initial_threshold, min_vol):
     expanded_labels = labels.copy()
     vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area', 'centroid')))
     small_labels = vesicle_regions[vesicle_regions.area < min_vol * 0.5].set_index('label')
-    # step = 0.025
-    # for threshold in tqdm(np.arange((initial_threshold-step), 0.8, -step), desc="Expanding labels until none is too small"):
-    #     labels = skimage.morphology.label(deep_mask>threshold)
-    #     new_vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area')))
-    #     new_vesicle_regions.set_index('label', inplace=True)
-    #     small_labels_fixed = []
-    #     for label, row in small_labels.iterrows():
-    #         centroid = (row['centroid-0'],row['centroid-1'],row['centroid-2'])
-    #         centroid = tuple(np.array(centroid).astype(np.int))
-    #         new_label = labels[centroid]
-    #         if (new_label) == 0:
-    #             pass
-    #         else:
-    #             new_vol = new_vesicle_regions.loc[new_label].area
-    #             if new_vol >= 0.2 * min_vol:
-    #                 expanded_labels[np.where(labels==new_label)] = label
-    #                 small_labels_fixed.append(label)
-    #     small_labels = small_labels.drop(labels=small_labels_fixed)
-    #     if len(small_labels) == 0 :
-    #         break
+    step = 0.025
+    for threshold in tqdm(np.arange((initial_threshold-step), 0.8, -step), desc="Expanding labels until none is too small"):
+        labels = skimage.morphology.label(deep_mask>threshold)
+        new_vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area')))
+        new_vesicle_regions.set_index('label', inplace=True)
+        small_labels_fixed = []
+        for label, row in small_labels.iterrows():
+            centroid = (row['centroid-0'],row['centroid-1'],row['centroid-2'])
+            centroid = tuple(np.array(centroid).astype(np.int))
+            new_label = labels[centroid]
+            if (new_label) == 0:
+                pass
+            else:
+                new_vol = new_vesicle_regions.loc[new_label].area
+                if new_vol >= 0.2 * min_vol:
+                    expanded_labels[np.where(labels==new_label)] = label
+                    small_labels_fixed.append(label)
+        small_labels = small_labels.drop(labels=small_labels_fixed)
+        if len(small_labels) == 0 :
+            break
+    return expanded_labels, small_labels
+
+def expand_small_labels(deep_mask,deep_labels,ves_table, min_vol ,initial_threshold):
+    expanded_labels = deep_labels.copy()
+    print(min_vol)
+    # pacman_vesicles = ves_table[(ves_table['extent'] > 0.5) & (ves_table['area'] < min_vol)]
+    pacman_vesicles = ves_table[(ves_table['area'] < min_vol)]
+    small_labels = pacman_vesicles.set_index('label')
+    print(small_labels)
+    step = 0.025
+    for threshold in tqdm(np.arange((initial_threshold-step), 0.8, -step), desc="Expanding labels until none is too small"):
+        labels = skimage.morphology.label(deep_mask>threshold)
+        new_vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area')))
+        new_vesicle_regions.set_index('label', inplace=True)
+        small_labels_fixed = []
+        for label, row in small_labels.iterrows():
+            centroid = (row['centroid-0'],row['centroid-1'],row['centroid-2'])
+            centroid = tuple(np.array(centroid).astype(np.int))
+            new_label = labels[centroid]
+            if (new_label) == 0:
+                pass
+            else:
+                new_vol = new_vesicle_regions.loc[new_label].area
+                if new_vol >= 4.0 * min_vol:
+                    expanded_labels[np.where(labels==new_label)] = label
+                    small_labels_fixed.append(label)
+        small_labels = small_labels.drop(labels=small_labels_fixed)
+        if len(small_labels) == 0 :
+            break
+
     return expanded_labels, small_labels
 
 
@@ -541,6 +571,7 @@ def vesicles_table(labels):
 
 def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1):
     collision_ves = ves_table[(ves_table['extent_zscore'] < -2) & (ves_table['area_zscore'] > 1)]
+    print(collision_ves)
     old_mask = deep_mask.copy()
     old_label = deep_labels.copy()
     for i in collision_ves.iterrows():
@@ -562,35 +593,14 @@ def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1
         pre_labels, pre_nc = skimage.morphology.label(sub_old_mask > thr, return_num=True, connectivity=None)
         # print(pre_nc)
         is_break = 0
-        for th in np.arange(thr, 1, 0.01):
-            # temp=sub_old_label_mask>th
-            temp = sub_old_mask > th
-            labels, nc = skimage.morphology.label(temp, return_num=True, connectivity=None)
-            if nc > pre_nc:
-                is_break = 1
-                # print(pre_nc, nc)
-                px, py, pz = np.where(labels > 0)
-
-                pxq, pyq, pzq = np.where(~sub_old_label_mask)
-
-                old_label[pxq + collision_ves['bbox-0'][i[0]] - delta_size,
-                          pyq + collision_ves['bbox-1'][i[0]] - delta_size,
-                          pzq + collision_ves['bbox-2'][i[0]] - delta_size] = 0
-                # old_label[collision_ves['bbox-0'][i[0]] - delta_size: collision_ves['bbox-3'][i[0]] + delta_size + 1,
-                # collision_ves['bbox-1'][i[0]] - delta_size: collision_ves['bbox-4'][i[0]] + delta_size + 1,
-                # collision_ves['bbox-2'][i[0]] - delta_size: collision_ves['bbox-5'][i[0]] + delta_size + 1] = labels
-
-                old_label[px + collision_ves['bbox-0'][i[0]] - delta_size,
-                          py + collision_ves['bbox-1'][i[0]] - delta_size,
-                          pz + collision_ves['bbox-2'][i[0]] - delta_size] = collision_ves['bbox-0'][i[0]] + 1000
-                break
-        if is_break == 0:
-            for th in np.arange(0.99, 1, 0.001):
+        while is_break:
+            max_t = 1
+            step  = 0.01
+            for th in np.arange(thr, max_t, 0.01):
                 # temp=sub_old_label_mask>th
                 temp = sub_old_mask > th
                 labels, nc = skimage.morphology.label(temp, return_num=True, connectivity=None)
                 if nc > pre_nc:
-                    # print(th)
                     is_break = 1
                     # print(pre_nc, nc)
                     px, py, pz = np.where(labels > 0)
@@ -603,10 +613,41 @@ def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1
                     # old_label[collision_ves['bbox-0'][i[0]] - delta_size: collision_ves['bbox-3'][i[0]] + delta_size + 1,
                     # collision_ves['bbox-1'][i[0]] - delta_size: collision_ves['bbox-4'][i[0]] + delta_size + 1,
                     # collision_ves['bbox-2'][i[0]] - delta_size: collision_ves['bbox-5'][i[0]] + delta_size + 1] = labels
+
                     old_label[px + collision_ves['bbox-0'][i[0]] - delta_size,
                               py + collision_ves['bbox-1'][i[0]] - delta_size,
                               pz + collision_ves['bbox-2'][i[0]] - delta_size] = collision_ves['bbox-0'][i[0]] + 1000
                     break
+            max_t = 1-step
+            step = step/10
+            if step == 0.0000001:
+                break
+
+
+        # if is_break == 0:
+        #     # Todo: merge the loop
+        #     for th in np.arange(0.99, 1, 0.001):
+        #         # temp=sub_old_label_mask>th
+        #         temp = sub_old_mask > th
+        #         labels, nc = skimage.morphology.label(temp, return_num=True, connectivity=None)
+        #         if nc > pre_nc:
+        #             # print(th)
+        #             is_break = 1
+        #             # print(pre_nc, nc)
+        #             px, py, pz = np.where(labels > 0)
+        #
+        #             pxq, pyq, pzq = np.where(~sub_old_label_mask)
+        #
+        #             old_label[pxq + collision_ves['bbox-0'][i[0]] - delta_size,
+        #                       pyq + collision_ves['bbox-1'][i[0]] - delta_size,
+        #                       pzq + collision_ves['bbox-2'][i[0]] - delta_size] = 0
+        #             # old_label[collision_ves['bbox-0'][i[0]] - delta_size: collision_ves['bbox-3'][i[0]] + delta_size + 1,
+        #             # collision_ves['bbox-1'][i[0]] - delta_size: collision_ves['bbox-4'][i[0]] + delta_size + 1,
+        #             # collision_ves['bbox-2'][i[0]] - delta_size: collision_ves['bbox-5'][i[0]] + delta_size + 1] = labels
+        #             old_label[px + collision_ves['bbox-0'][i[0]] - delta_size,
+        #                       py + collision_ves['bbox-1'][i[0]] - delta_size,
+        #                       pz + collision_ves['bbox-2'][i[0]] - delta_size] = collision_ves['bbox-0'][i[0]] + 1000
+        #             break
     #
     #
     # pl2.quick_setup(['deep_mask','deep_labels'])
@@ -647,9 +688,9 @@ def get_centroids_from_regions(vesicle_regions):
 
 
 
-def remove_outliers(deep_labels,ves_table, min_vol ,delta_size = 1):
+def remove_outliers(deep_labels,ves_table, min_vol ):
     new_label = deep_labels.copy()
-    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.25 ) | (ves_table['extent'] > 0.75) ]
+    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.25 ) | (ves_table['extent'] > 0.75) | (ves_table['area'] < 0.5* min_vol)]
     verysmall_vesicles = verysmall_vesicles.set_index('label')
     print(verysmall_vesicles)
     new_label[np.isin(new_label, verysmall_vesicles.index)] = 0
