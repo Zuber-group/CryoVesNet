@@ -297,37 +297,39 @@ class Pipeline():
         self.set_array('image')
         self.set_array('deep_labels')
         self.set_array(input_array_name)
-        self.deep_mask = getattr(self, input_array_name)
-        self.deep_mask = prepyto.crop_edges(self.deep_mask, radius=self.min_radius)
-        if within_segmentation_region:
-            self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
-
+        # self.deep_mask = getattr(self, input_array_name)
+        # self.deep_mask = prepyto.crop_edges(self.deep_mask, radius=self.min_radius)
+        # if within_segmentation_region:
+        #     self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
+        #
         opt_th, mean_shell_val = prepyto.my_threshold(self.image, self.deep_mask)
         threshold = threshold_coef * opt_th
+        #
+        # deep_labels = skimage.morphology.label(self.deep_mask > threshold)
 
-        deep_labels = skimage.morphology.label(self.deep_mask > threshold)
         deep_labels= self.deep_labels
+        ves_table2 = prepyto.vesicles_table(deep_labels)
+        # deep_labels, small_labels = prepyto.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol,p=1, q=4, t=0.8)
+
+
 
         ves_table = prepyto.vesicles_table(deep_labels)
         deep_labels = prepyto.collision_solver(self.deep_mask, deep_labels, ves_table, threshold, delta_size=1)
 
 
-        ves_table = prepyto.vesicles_table(deep_labels)
-        deep_labels,small_labels = prepyto.expand_small_labels(self.deep_mask , deep_labels, ves_table, self.min_vol, initial_threshold=threshold)
+        deep_labels, small_labels = prepyto.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol,p=1, q=2, t=0.7)
 
-        ves_table = prepyto.vesicles_table(deep_labels)
-        deep_labels = prepyto.remove_outliers(deep_labels, ves_table, self.min_vol)
+        # if len(small_labels):
+        #     print(
+        #         "The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
+        #     print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
+        #     print(small_labels)
+        #     deep_labels[np.isin(deep_labels, small_labels.index)] = 0
 
-        # deep_labels, small_labels = prepyto.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol)
-        if len(small_labels):
-            print(
-                "The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
-            print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
-            print(small_labels)
-            deep_labels[np.isin(deep_labels, small_labels.index)] = 0
 
+        deep_labels = prepyto.pacman_killer(deep_labels)
         ves_table = prepyto.vesicles_table(deep_labels)
-        deep_labels = prepyto.remove_outliers(deep_labels, ves_table, self.min_vol)
+        deep_labels,badVesicles = prepyto.remove_outliers(deep_labels, ves_table, self.min_vol)
 
 
         self.clean_deep_labels = deep_labels.astype(np.uint16)
@@ -337,7 +339,7 @@ class Pipeline():
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
-        return ves_table
+        return ves_table2,badVesicles
 
     def label_vesicles(self, input_array_name='deep_mask', within_segmentation_region=True,
                        memkill=True):
