@@ -16,7 +16,7 @@ import numpy as np
 
 
 dataset_directory = "/mnt/data/amin/Handpicked/133/"
-# dataset_directory = "/mnt/data/amin/ctrl/5"
+dataset_directory = "/mnt/data/amin/ctrl/8"
 # dataset_directory = "/mnt/data/amin/treatment/3"
 
 

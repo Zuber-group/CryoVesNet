@@ -317,14 +317,14 @@ class Pipeline():
         deep_labels = prepyto.collision_solver(self.deep_mask, deep_labels, ves_table, threshold, delta_size=1)
 
 
-        deep_labels, small_labels = prepyto.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol,p=1, q=2, t=0.7)
+        deep_labels, small_labels = prepyto.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol,p=1, q=4, t=0.8)
 
-        # if len(small_labels):
-        #     print(
-        #         "The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
-        #     print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
-        #     print(small_labels)
-        #     deep_labels[np.isin(deep_labels, small_labels.index)] = 0
+        if len(small_labels):
+            print(
+                "The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
+            print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
+            print(small_labels)
+            deep_labels[np.isin(deep_labels, small_labels.index)] = 0
 
 
         deep_labels = prepyto.pacman_killer(deep_labels)

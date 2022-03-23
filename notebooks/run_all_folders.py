@@ -16,8 +16,8 @@ import numpy as np
 
 
 dataset_directory = "/mnt/data/amin/Handpicked/"
-dataset_directory = "/mnt/data/amin/ctrl/"
-dataset_directory = "/mnt/data/amin/treatment/"
+# dataset_directory = "/mnt/data/amin/ctrl/"
+# dataset_directory = "/mnt/data/amin/treatment/"
 # dataset_directory = "/mnt/data/amin/bad/"
 # dataset_directory = "
 # /mnt/data/amin/bad/"
@@ -28,7 +28,7 @@ def my_function(directory):
     pl.network_size = 64
     pl.setup_prepyto_dir()
 
-    pl.run_deep(force_run=True, rescale=1.0)
+    pl.run_deep(force_run=True, rescale=0.5)
     pl.zoom(force_run=True, )
     pl.label_vesicles(within_segmentation_region = True)
     pl.label_vesicles_simply(within_segmentation_region = True, input_array_name="deep_mask")
