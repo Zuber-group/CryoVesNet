@@ -398,7 +398,7 @@ def oneToOneCorrection(old_label, new_label, delta_size=3):
     best_corrected_labels = best_corrected_labels.astype(np.uint16)
     return best_corrected_labels
 
-def get_sphere_dataframe(image, image_label, margin=5):
+def get_sphere_dataframe(image, image_label, margin=1):
     corrected_labels = np.zeros(image_label.shape, dtype=int)
     image_bounding_box = get_image_bounding_box(image_label)
     vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(image_label,
@@ -406,22 +406,24 @@ def get_sphere_dataframe(image, image_label, margin=5):
     bboxes = get_bboxes_from_regions(vesicle_regions)
     centroids = get_centroids_from_regions(vesicle_regions)
     labels = get_labels_from_regions(vesicle_regions)
-    thicknesses, densities, radii, centers, kept_labels,my_radial = [],[],[],[],[],[]
+    thicknesses, membrane_densities, radii, centers, kept_labels,my_radial, lumen_densities, outer_densities = [],[],[],[],[],[],[],[]
     for i in tqdm(range(len(vesicle_regions)), desc="fitting sphere to vesicles"):
         radius = get_label_largest_radius(bboxes[i])  #this is an integer
         rounded_centroid = np.round(centroids[i]).astype(np.int) #this is an array of integers
         label = labels[i]
-        density, keep_label, new_centroid, new_radius, thickness, radial = get_sphere_parameters(image, label, margin, radius,
+        membrane_density, keep_label, new_centroid, new_radius, thickness, radial, lumen_density, outside_density = get_sphere_parameters(image, label, margin, radius,
                                                                                          rounded_centroid)
         if keep_label:
             thicknesses.append(thickness)
-            densities.append(density)
+            membrane_densities.append(membrane_density)
             radii.append(new_radius)
             centers.append(new_centroid)
             kept_labels.append(label)
             my_radial.append(radial)
-    df = pd.DataFrame(zip(kept_labels, thicknesses, densities, radii, centers),
-                          columns=['label','thickness','density','radius','center'])
+            lumen_densities.append(lumen_density)
+            outside_densities.append(outside_density)
+    df = pd.DataFrame(zip(kept_labels, thicknesses, membrane_densities, lumen_densities, outer_densities, radii, centers),
+                          columns=['label','thickness','membrane density', 'lumen density', 'outer density','radius','center'])
     df = df.set_index('label')
     return df,my_radial
 
@@ -429,17 +431,18 @@ def get_sphere_dataframe(image, image_label, margin=5):
 def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
     try:
         if label not in  [72]:
-            shift, new_radius = get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=margin)
+            shift, new_radius, error, phasediff = get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=margin)
             new_centroid = (rounded_centroid - shift).astype(np.int)
             image_box = extract_box_of_radius(image, new_centroid, radius + margin)
-            thickness, density, radial = get_sphere_membrane_thickness_and_density_from_image(image_box)
+            thickness, membrane_density, lumen_density, outer_density, radial = get_sphere_membrane_thickness_and_density_from_image(image_box)
             keep_label = True
         else:
-
             keep_label = False
             radial = np.zeros(100)
             thickness = np.nan
-            density = np.nan
+            membrane_density = np.nan
+            lumen_density = np.nan
+            outer_density = np.nan
             new_radius = np.nan
             new_centroid = rounded_centroid
 
@@ -451,10 +454,12 @@ def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
         keep_label = False
         radial= np.zeros(100)
         thickness = np.nan
-        density = np.nan
+        membrane_density = np.nan
+        lumen_density = np.nan
+        outer_density = np.nan
         new_radius = np.nan
         new_centroid = rounded_centroid
-    return density, keep_label, new_centroid, new_radius, thickness,radial
+    return membrane_density, keep_label, new_centroid, new_radius, thickness,radial, lumen_density, outer_density
 
 
 def mahalanobis_distances(df, axis=0):
@@ -665,7 +670,7 @@ def add_sphere_labels_under_points(image, image_labels, points_to_add,
         point_size = points_to_add_sizes[i]
         radius = int(max(point_size, minimum_box_size)//2)
         label = i + max_label + 1
-        density, keep_label, new_centroid, new_radius, thickness = \
+        membrane_density, keep_label, new_centroid, new_radius, thickness, radial, lumen_density, outer_density = \
             get_sphere_parameters(image, label, 5, radius, rounded_centroid)
         if keep_label:
             put_spherical_label_in_array(corrected_labels, new_centroid, new_radius, label, inplace = True)
@@ -970,7 +975,7 @@ def get_optimal_sphere_radius_from_radial_profile(radial_profile):
     """
     i_membrane_center, _ = get_sphere_membrane_center_and_density_from_radial_profile(radial_profile)
     i_upper_limit = get_radial_profile_i_upper_limit(radial_profile)
-    i_membrane_outer_halo = i_membrane_center + radial_profile[i_membrane_center:i_upper_limit].argmax()
+    i_membrane_outer_halo = i_membrane_center + radial_profile[i_membrane_center:i_upper_limit+1].argmax()
     derivative2 = np.diff(radial_profile,2)
     optimal_radius = i_membrane_center + ndimage.gaussian_filter1d(derivative2, 1)[i_membrane_center:i_membrane_outer_halo+1].argmin()
     return(optimal_radius)
@@ -980,29 +985,32 @@ def get_sphere_membrane_center_and_density_from_radial_profile(radial_profile):
     i_lower_limit = round(len(radial_profile)*0.1)
     i_upper_limit = get_radial_profile_i_upper_limit(radial_profile)
     i_membrane_center = i_lower_limit + radial_profile[i_lower_limit:i_upper_limit].argmin()
-    density = radial_profile[i_membrane_center]
-    return i_membrane_center, density
-
+    membrane_density = radial_profile[i_membrane_center]
+    return i_membrane_center, membrane_density
 
 def get_radial_profile_i_upper_limit(radial_profile):
     length = len(radial_profile)
-    i_upper_limit = round(length * 0.75)
+    i_upper_limit = round(length * 0.9)
     return i_upper_limit
 
 
 def get_sphere_membrane_thickness_and_density_from_radial_profile(radial_profile):
-    i_membrane_center, density = get_sphere_membrane_center_and_density_from_radial_profile(radial_profile)
+    i_membrane_center, membrane_density = get_sphere_membrane_center_and_density_from_radial_profile(radial_profile)
     sphere_radius = get_optimal_sphere_radius_from_radial_profile(radial_profile)
     thickness = 2 * (sphere_radius - i_membrane_center)
-    return thickness, density
+    membrane_inner_edge = min(2, (i_membrane_center - thickness/2))
+    membrane_outer_edge = min((i_membrane_center + thickness/2), len(radial_profile)-1)
+    lumen_density = radial_profile[:membrane_inner_edge+1].mean()
+    outer_density = radial_profile[membrane_outer_edge:].mean()
+    return thickness, membrane_density, lumen_density, outer_density
 
 def get_sphere_membrane_thickness_and_density_from_image(image):
     radial_profile = get_radial_profile(image)
-    thickness, density = get_sphere_membrane_thickness_and_density_from_radial_profile(radial_profile)
+    thickness, membrane_density, lumen_density, outer_density = get_sphere_membrane_thickness_and_density_from_radial_profile(radial_profile)
     d = interpolate.interp1d(np.arange(len(radial_profile)),radial_profile)
     xnew = np.arange(0, len(radial_profile)-1, (len(radial_profile)-0.9999999999) / 100)
     ynew = d(xnew)
-    return thickness, density,ynew
+    return thickness, membrane_density, lumen_density, outer_density, ynew
 
 def get_optimal_sphere_radius_from_image(image):
     radial_profile = get_radial_profile(image)
@@ -1011,24 +1019,24 @@ def get_optimal_sphere_radius_from_image(image):
 
 def get_shift_between_images(reference_image, moving_image):
     try:
-        shift, _, _ = skimage.registration.phase_cross_correlation(reference_image, moving_image)
+        shift, error, phasediff = skimage.registration.phase_cross_correlation(reference_image, moving_image)
     except ValueError:
         shift = np.zeros(3)
         print("get_shift_between_images failed, shift set to 0,0,0")
-    return shift
+    return shift, error, phasediff
 
 def get_shift_of_sphere(image,origin=None):
     average_image = get_3d_radial_average(image, origin)
-    shift = get_shift_between_images(average_image, image)
-    return shift
+    shift, error, phasediff = get_shift_between_images(average_image, image)
+    return shift, error, phasediff
 
-def get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=5, max_cycles=10, max_shift_ratio=0.5):
+def get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=2, max_cycles=10, max_shift_ratio=0.5):
     image_box = extract_box_of_radius(image, rounded_centroid, radius + margin)
-    max_shift = max_shift_ratio * np.linalg.norm(image.shape)
+    max_shift = max_shift_ratio * np.linalg.norm(image_box.shape)
     total_shift = np.array((0,0,0))
     no_change_count = 0
     for i in range(max_cycles):
-        shift = get_shift_of_sphere(image_box)
+        shift, error, phasediff = get_shift_of_sphere(image_box)
         total_shift = total_shift + shift
         if np.linalg.norm(total_shift) > max_shift:
             total_shift -= shift
@@ -1043,7 +1051,7 @@ def get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, marg
         if new_radius != radius:
             radius = new_radius
             image_box = extract_box_of_radius(image, new_centroid, radius + margin)
-    return total_shift, radius
+    return total_shift, radius, error, phasediff
 
 def rearrange_labels(image_label, dtype=np.int16):
     """rearrange the labels so that they go from 1 to n labels. Label order is preserved. The goal
