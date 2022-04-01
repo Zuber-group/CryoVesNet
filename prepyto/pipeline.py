@@ -454,7 +454,9 @@ class Pipeline():
         corr_s = [spearmanr(x, mu)[0] for x in radials]
         sphere_df['corr'] = corr_s
         mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center', 'corr'], axis=1))
+        mahalanobis_no_radius_series = prepyto.mahalanobis_distances(sphere_df.drop(['center', 'corr', 'radius'], axis=1))
         sphere_df['mahalanobis'] = mahalanobis_series
+        sphere_df['mahalanobis without radius'] = mahalanobis_no_radius_series
         print(len(sphere_df))
         sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], 2)
         sphere_df['radials'] = radials.tolist()

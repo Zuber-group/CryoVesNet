@@ -407,12 +407,16 @@ def get_sphere_dataframe(image, image_label, margin=1):
     centroids = get_centroids_from_regions(vesicle_regions)
     labels = get_labels_from_regions(vesicle_regions)
     thicknesses, membrane_densities, radii, centers, kept_labels,my_radial, lumen_densities, outer_densities = [],[],[],[],[],[],[],[]
+    lumen2membrane_densities, outer2membrane_densities, lumen2outer_densities = [],[],[]
     for i in tqdm(range(len(vesicle_regions)), desc="fitting sphere to vesicles"):
         radius = get_label_largest_radius(bboxes[i])  #this is an integer
         rounded_centroid = np.round(centroids[i]).astype(np.int) #this is an array of integers
         label = labels[i]
-        membrane_density, keep_label, new_centroid, new_radius, thickness, radial, lumen_density, outside_density = get_sphere_parameters(image, label, margin, radius,
+        membrane_density, keep_label, new_centroid, new_radius, thickness, radial, lumen_density, outer_density = get_sphere_parameters(image, label, margin, radius,
                                                                                          rounded_centroid)
+        lumen2membrane_density = lumen_density / membrane_density
+        outer2membrane_density = outer_density / membrane_density
+        lumen2outer_density = lumen_density / outer_density
         if keep_label:
             thicknesses.append(thickness)
             membrane_densities.append(membrane_density)
@@ -421,9 +425,16 @@ def get_sphere_dataframe(image, image_label, margin=1):
             kept_labels.append(label)
             my_radial.append(radial)
             lumen_densities.append(lumen_density)
-            outside_densities.append(outside_density)
-    df = pd.DataFrame(zip(kept_labels, thicknesses, membrane_densities, lumen_densities, outer_densities, radii, centers),
-                          columns=['label','thickness','membrane density', 'lumen density', 'outer density','radius','center'])
+            outer_densities.append(outer_density)
+            lumen2membrane_densities.append(lumen2membrane_density)
+            outer2membrane_densities.append(outer2membrane_density)
+            lumen2outer_densities.append(lumen2outer_density)
+    df = pd.DataFrame(zip(kept_labels, thicknesses, membrane_densities, lumen_densities, outer_densities,
+                          radii, centers, lumen2membrane_densities, outer2membrane_densities, lumen2outer_densities),
+                          columns=['label','thickness','membrane density', 'lumen density', 'outer density','radius',
+                                   'center', 'lumen/membrane density', 'outer/membrane density',
+                                   'lumen/outer density']
+                      )
     df = df.set_index('label')
     return df,my_radial
 
@@ -998,8 +1009,8 @@ def get_sphere_membrane_thickness_and_density_from_radial_profile(radial_profile
     i_membrane_center, membrane_density = get_sphere_membrane_center_and_density_from_radial_profile(radial_profile)
     sphere_radius = get_optimal_sphere_radius_from_radial_profile(radial_profile)
     thickness = 2 * (sphere_radius - i_membrane_center)
-    membrane_inner_edge = min(2, (i_membrane_center - thickness/2))
-    membrane_outer_edge = min((i_membrane_center + thickness/2), len(radial_profile)-1)
+    membrane_inner_edge = int(min(2, (i_membrane_center - thickness/2)))
+    membrane_outer_edge = int(min((i_membrane_center + thickness/2), len(radial_profile)-1))
     lumen_density = radial_profile[:membrane_inner_edge+1].mean()
     outer_density = radial_profile[membrane_outer_edge:].mean()
     return thickness, membrane_density, lumen_density, outer_density
