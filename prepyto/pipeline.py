@@ -458,8 +458,8 @@ class Pipeline():
         sphere_df['mahalanobis'] = mahalanobis_series
         sphere_df['mahalanobis without radius'] = mahalanobis_no_radius_series
         print(len(sphere_df))
-        sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], len(mahalanobis_series) )
-        sphere_df['p without radius'] = 1 - chi2.cdf(sphere_df['mahalanobis'], len(mahalanobis_no_radius_series))
+        sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], len(sphere_df.columns)-10 )
+        sphere_df['p without radius'] = 1 - chi2.cdf(sphere_df['mahalanobis without radius'], len(sphere_df.columns)-11 )
         sphere_df['radials'] = radials.tolist()
         # self.trash_df= sphere_df[sphere_df['mahalanobis'] >= m]
         # sphere_df = sphere_df[sphere_df['mahalanobis'] <m]
