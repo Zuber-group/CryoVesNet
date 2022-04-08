@@ -108,8 +108,8 @@ class Pipeline():
 
         if self.image_path.exists():
             self.set_array('image')
-        # if self.sphere_df_path.exists():
-        #     self.sphere_df = pd.read_pickle(self.sphere_df_path)
+        if self.sphere_df_path.exists():
+            self.sphere_df = pd.read_pickle(self.sphere_df_path)
 
     def quick_setup(self, labels_to_load=['sphere_labels']):
         self.set_array('image')
@@ -443,7 +443,8 @@ class Pipeline():
             self.clear_memory(exclude=self.last_output_array_name)
         self.print_output_info()
 
-    def compute_sphere_dataframe(self, input_array_name='last_output_array_name'):
+    def compute_sphere_dataframe(self, input_array_name='last_output_array_name',
+                                 mahalanobis_criteria=['thickness', 'membrane density', 'radius']):
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
@@ -453,18 +454,17 @@ class Pipeline():
         mu = np.mean(radials, axis=0)
         corr_s = [spearmanr(x, mu)[0] for x in radials]
         sphere_df['corr'] = corr_s
-        mahalanobis_series = prepyto.mahalanobis_distances(sphere_df.drop(['center', 'corr'], axis=1))
-        mahalanobis_no_radius_series = prepyto.mahalanobis_distances(sphere_df.drop(['center', 'corr', 'radius'], axis=1))
-        sphere_df['mahalanobis'] = mahalanobis_series
-        sphere_df['mahalanobis without radius'] = mahalanobis_no_radius_series
-        print(len(sphere_df))
-        sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], len(sphere_df.columns)-10 )
-        sphere_df['p without radius'] = 1 - chi2.cdf(sphere_df['mahalanobis without radius'], len(sphere_df.columns)-11 )
-        sphere_df['radials'] = radials.tolist()
+        #all_criteria = ['thickness','membrane density', 'lumen density', 'outer density','radius',
+        #                'lumen/membrane density', 'outer/membrane density', 'lumen/outer density']
+        mahalanobis = prepyto.mahalanobis_distances(sphere_df[mahalanobis_criteria].copy())
+        sphere_df['mahalanobis'] = mahalanobis
+        sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], len(mahalanobis_criteria))
+        #sphere_df['p without radius'] = 1 - chi2.cdf(sphere_df['mahalanobis without radius'], 4 )
+        #sphere_df['radials'] = radials.tolist()
         # self.trash_df= sphere_df[sphere_df['mahalanobis'] >= m]
         # sphere_df = sphere_df[sphere_df['mahalanobis'] <m]
         # sphere_df = sphere_df[sphere_df['corr'] > 0.3]
-        print(len(sphere_df))
+        #print(len(sphere_df))
 
         # sphere_df["radial"] = radials
         # mu = np.mean(radials,axis=0)
@@ -476,6 +476,53 @@ class Pipeline():
         # print(len(sphere_df))
         sphere_df.to_pickle(self.sphere_df_path)
         self.sphere_df = sphere_df
+
+    def refine_sphere_outliers(self, input_array_name='last_output_array_name',
+                               mahalanobis_criteria=['thickness', 'membrane density', 'radius'],
+                               p_threshold=0.1, margin_search_range=range(0,5),
+                               drop_unfixed = True):
+        if input_array_name == 'last_output_array_name':
+            input_array_name = self.last_output_array_name
+        self.set_array(input_array_name)
+        sphere_df = self.sphere_df
+        fixed_df = pd.DataFrame(data=None, columns=sphere_df.columns)
+        unfixed_labels = []
+        mahalanobis = prepyto.mahalanobis_distances(sphere_df[mahalanobis_criteria])
+        sphere_df['mahalanobis'] = mahalanobis
+        sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], len(mahalanobis_criteria))
+        outliers = sphere_df[sphere_df['p'] < p_threshold]
+        print(f"outliers are {outliers.index}")
+        for label in outliers.index:
+            sphere_df_copy = sphere_df.copy()
+            fixed = False
+            for margin in margin_search_range:
+                old_radius = outliers.loc[label].radius
+                old_centroid = outliers.loc[label].center
+                membrane_density, keep_label, new_centroid, new_radius, thickness, radial, lumen_density, outer_density = \
+                    prepyto.get_sphere_parameters(self.image, label, margin, old_radius, old_centroid)
+                lumen2membrane_density = lumen_density / membrane_density
+                outer2membrane_density = outer_density / membrane_density
+                lumen2outer_density = lumen_density / outer_density
+                sphere_df_copy.loc[label] = [thickness,membrane_density,lumen_density,outer_density,new_radius,new_centroid,
+                                             lumen2membrane_density,outer2membrane_density,lumen2outer_density,np.nan,
+                                             np.nan,np.nan]
+                mahalanobis = prepyto.mahalanobis_distances(sphere_df_copy[mahalanobis_criteria])
+                p = 1 - chi2.cdf(mahalanobis, len(mahalanobis_criteria))
+                i = sphere_df.index.get_loc(label)
+                this_p = p[i]
+                if this_p > p_threshold:
+                    fixed = True
+                    fixed_df.loc[label] = sphere_df_copy.loc[label].copy()
+                    print(f"label {label} fixed.")
+                    break
+            if not fixed: unfixed_labels.append(label)
+        sphere_df.loc[fixed_df.index, :] = fixed_df[:]
+        if drop_unfixed: sphere_df.drop(labels=unfixed_labels, inplace=True)
+        sphere_df.mahalanobis = prepyto.mahalanobis_distances(sphere_df[mahalanobis_criteria])
+        sphere_df.p = 1 - chi2.cdf(sphere_df['mahalanobis'], len(mahalanobis_criteria))
+        return fixed_df.index, unfixed_labels
+
+
 
     def make_spheres(self, input_array_name='last_output_array_name', memkill=True):
         print("Prepyto Pipeline: Making vesicles spherical.")
