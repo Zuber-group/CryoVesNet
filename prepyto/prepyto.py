@@ -487,6 +487,7 @@ def mahalanobis_distances(df, axis=0):
         axis: 0 to find outlier rows, 1 to find outlier columns
     copyright @ http://github.com/tyarkoni/pliers
     '''
+    df = df.astype(float)
     df = df.transpose() if axis == 1 else df
     means = df.mean()
     try:
