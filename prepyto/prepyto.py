@@ -231,6 +231,9 @@ def adjust_shell_intensity(image_int, image_labels):
             best_mask = mask_adjusted
     return best_param, best_mask  # , mean_shell
 
+
+
+
 def objectwise_evalution(reff, prediction, delta_size=1, proportion=0.0):
     reff = reff.copy()
     prediction = prediction.copy()
@@ -335,6 +338,77 @@ def objectwise_evalution(reff, prediction, delta_size=1, proportion=0.0):
     # important = [np.mean(tab, axis=0).tolist(), np.std(tab, axis=0).tolist()]
     return important
 
+
+
+
+def objectwise_evalution2(reff, prediction, delta_size=1, proportion=0.0):
+    reff = reff.copy()
+    prediction = prediction.copy()
+    reff_regions = skimage.measure.regionprops_table(reff, properties=('centroid', 'label', 'bbox'))
+    predict_regions = skimage.measure.regionprops_table(prediction, properties=('centroid', 'label', 'bbox'))
+    all = []
+    TP = 0
+    FP = 0
+    FN = 0
+    print(np.shape(reff))
+    for i in range(0, len(predict_regions['label'])):
+        pred_center = (int(predict_regions['centroid-0'][i]), int(predict_regions['centroid-1'][i]), int(predict_regions['centroid-2'][i]))
+
+        # print(pred_center)
+        # print(predict_regions['label'][i])
+        # print(reff[pred_center])
+
+        if reff[pred_center] != 0:
+            TP = TP+1
+
+        else:
+            FP = FP + 1
+            qx, qy, qz = np.where(prediction ==  predict_regions['label'][i])
+            prediction[qx, qy, qz] = 0
+        # print(reff_diameter, predicted_diameter)
+        # unique = np.unique(prediction[px, py, pz])
+
+
+    for i in range(0, len(reff_regions['label'])):
+
+        sub_old_label = reff[
+                        reff_regions['bbox-0'][i] - delta_size: reff_regions['bbox-3'][i] + delta_size + 1,
+                        reff_regions['bbox-1'][i] - delta_size: reff_regions['bbox-4'][i] + delta_size + 1,
+                        reff_regions['bbox-2'][i] - delta_size: reff_regions['bbox-5'][i] + delta_size + 1]
+        sub_new_label = prediction[
+                        reff_regions['bbox-0'][i] - delta_size: reff_regions['bbox-3'][i] + delta_size + 1,
+                        reff_regions['bbox-1'][i] - delta_size: reff_regions['bbox-4'][i] + delta_size + 1,
+                        reff_regions['bbox-2'][i] - delta_size: reff_regions['bbox-5'][i] + delta_size + 1]
+
+        sub_old_label_mask = sub_old_label == reff_regions['label'][i]
+
+        px, py, pz = np.where(sub_old_label_mask)
+        areaOfPrediction = sub_new_label[px, py, pz]
+
+        unique, counts = np.unique(areaOfPrediction, return_counts=True)
+        # print(unique)
+        # print(counts)
+        areaOfPrediction = np.delete(areaOfPrediction, np.where(areaOfPrediction == 0))
+        # (filter(lambda a: a != 2, areaOfPrediction))
+        unique, counts = np.unique(areaOfPrediction, return_counts=True)
+        # print(unique,counts)
+        if len(unique) == 0:
+            FN= FN+1
+            qx, qy, qz = np.where(reff == reff_regions['label'][i])
+            reff[qx, qy, qz] = 0
+
+    evaluator = evaluation_class.ConfusionMatrix(reff > 0, prediction > 0)
+    print(evaluator.former_dice())
+    print(len(reff_regions['label']))
+    print(len(predict_regions['label']))
+    print(TP)
+    print(FN)
+    print(FP)
+
+    important = [evaluator.former_dice(), len(reff_regions['label']), TP, FN , FP]
+    return important
+
+
 def oneToOneCorrection(old_label, new_label, delta_size=3):
     """
     this function give 2 label map OLD and NEW
@@ -398,7 +472,7 @@ def oneToOneCorrection(old_label, new_label, delta_size=3):
     best_corrected_labels = best_corrected_labels.astype(np.uint16)
     return best_corrected_labels
 
-def get_sphere_dataframe(image, image_label, margin=1):
+def get_sphere_dataframe(image, image_label, margin=5):
     corrected_labels = np.zeros(image_label.shape, dtype=int)
     image_bounding_box = get_image_bounding_box(image_label)
     vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(image_label,
@@ -441,22 +515,11 @@ def get_sphere_dataframe(image, image_label, margin=1):
 
 def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
     try:
-        if label not in  [72]:
-            shift, new_radius, error, phasediff = get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=margin)
-            new_centroid = (rounded_centroid - shift).astype(np.int)
-            image_box = extract_box_of_radius(image, new_centroid, radius + margin)
-            thickness, membrane_density, lumen_density, outer_density, radial = get_sphere_membrane_thickness_and_density_from_image(image_box)
-            keep_label = True
-        else:
-            keep_label = False
-            radial = np.zeros(100)
-            thickness = np.nan
-            membrane_density = np.nan
-            lumen_density = np.nan
-            outer_density = np.nan
-            new_radius = np.nan
-            new_centroid = rounded_centroid
-
+        shift, new_radius, error, phasediff = get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=margin)
+        new_centroid = (rounded_centroid - shift).astype(np.int)
+        image_box = extract_box_of_radius(image, new_centroid, radius + margin)
+        thickness, membrane_density, lumen_density, outer_density, radial = get_sphere_membrane_thickness_and_density_from_image(image_box)
+        keep_label = True
         # if thickness < 6:
         #     print(f"small thickness, label {label}")
     except ValueError:
@@ -470,7 +533,7 @@ def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
         outer_density = np.nan
         new_radius = np.nan
         new_centroid = rounded_centroid
-    return membrane_density, keep_label, new_centroid, new_radius, thickness,radial, lumen_density, outer_density
+    return membrane_density, keep_label, new_centroid, new_radius, thickness , radial, lumen_density, outer_density
 
 
 def mahalanobis_distances(df, axis=0):
@@ -492,7 +555,7 @@ def mahalanobis_distances(df, axis=0):
     means = df.mean()
     try:
         inv_cov = np.linalg.inv(df.cov())
-    except LinAlgError:
+    except np.linalg.LinAlgError:
         return pd.Series([np.NAN] * len(df.index), df.index,
                          name='Mahalanobis')
     dists = []
@@ -505,7 +568,7 @@ def make_vesicle_from_sphere_dataframe(image_label, sphere_df):
     sphere_dict = {}
     for label, row in sphere_df.iterrows():
         add_sphere_in_dict(sphere_dict, row.radius)
-        put_spherical_label_in_array(corrected_labels, row.center, row.radius, label,inplace=True)
+        put_spherical_label_in_array(corrected_labels, row.center, int(row.radius), label,inplace=True)
     return corrected_labels
 
 def add_sphere_in_dict(sphere_dict, radius):
@@ -550,11 +613,11 @@ def expand_small_labels(deep_mask,deep_labels,ves_table, min_vol ,initial_thresh
     expanded_labels = deep_labels.copy()
     print(min_vol)
     # pacman_vesicles = ves_table[(ves_table['extent'] > 0.5) & (ves_table['area'] < min_vol)]
-    pacman_vesicles = ves_table[(ves_table['area'] < min_vol)]
+    pacman_vesicles = ves_table[(ves_table['area'] > 0.5 * min_vol) & (ves_table['area'] < min_vol)]
     small_labels = pacman_vesicles.set_index('label')
     print(small_labels)
     step = 0.025
-    for threshold in tqdm(np.arange((initial_threshold-step), 0.8, -step), desc="Expanding labels until none is too small"):
+    for threshold in tqdm(np.arange((initial_threshold-step), 0.7, -step), desc="Expanding labels until none is too small"):
         labels = skimage.morphology.label(deep_mask>threshold)
         new_vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area')))
         new_vesicle_regions.set_index('label', inplace=True)
@@ -567,7 +630,7 @@ def expand_small_labels(deep_mask,deep_labels,ves_table, min_vol ,initial_thresh
                 pass
             else:
                 new_vol = new_vesicle_regions.loc[new_label].area
-                if new_vol >= 4.0 * min_vol:
+                if new_vol >= 1 * min_vol and new_vol <= 4 * min_vol:
                     expanded_labels[np.where(labels==new_label)] = label
                     small_labels_fixed.append(label)
         small_labels = small_labels.drop(labels=small_labels_fixed)
@@ -587,7 +650,7 @@ def vesicles_table(labels):
     return ves_tabel
 
 def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1):
-    collision_ves = ves_table[(ves_table['extent_zscore'] < -2) & (ves_table['area_zscore'] > 1)]
+    collision_ves = ves_table[(ves_table['extent'] < 0.25) & (ves_table['area_zscore'] > 1)]
     print(collision_ves)
     old_mask = deep_mask.copy()
     old_label = deep_labels.copy()
@@ -610,10 +673,10 @@ def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1
         pre_labels, pre_nc = skimage.morphology.label(sub_old_mask > thr, return_num=True, connectivity=None)
         # print(pre_nc)
         is_break = 0
-        while is_break:
-            max_t = 1
-            step  = 0.01
-            for th in np.arange(thr, max_t, 0.01):
+        base_thr = thr
+        step = 0.01
+        while not is_break:
+            for th in np.arange(base_thr, 1, step):
                 # temp=sub_old_label_mask>th
                 temp = sub_old_mask > th
                 labels, nc = skimage.morphology.label(temp, return_num=True, connectivity=None)
@@ -635,9 +698,10 @@ def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1
                               py + collision_ves['bbox-1'][i[0]] - delta_size,
                               pz + collision_ves['bbox-2'][i[0]] - delta_size] = collision_ves['bbox-0'][i[0]] + 1000
                     break
-            max_t = 1-step
+            base_thr = 1-step
             step = step/10
-            if step == 0.0000001:
+            # print(step)
+            if step  < 0.00000001:
                 break
 
 
@@ -705,9 +769,9 @@ def get_centroids_from_regions(vesicle_regions):
 
 
 
-def remove_outliers(deep_labels,ves_table, min_vol ):
+def     remove_outliers(deep_labels,ves_table, min_vol ):
     new_label = deep_labels.copy()
-    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.25 ) | (ves_table['extent'] > 0.75) | (ves_table['area'] < 0.5* min_vol)]
+    verysmall_vesicles = ves_table[(ves_table['extent'] < 0.25 ) | (ves_table['extent'] > 0.75) | (ves_table['area'] < 1* min_vol)]
     verysmall_vesicles = verysmall_vesicles.set_index('label')
     print(verysmall_vesicles)
     new_label[np.isin(new_label, verysmall_vesicles.index)] = 0
@@ -767,6 +831,7 @@ def get_bboxes_from_regions(vesicle_regions):
 
 
 def put_spherical_label_in_array(array, rounded_centroid, radius, label, inplace = False, sphere=None):
+    # print(label , rounded_centroid, radius)
     if sphere is None:
         sphere = skimage.morphology.ball(radius)
     if not inplace:
@@ -1002,7 +1067,7 @@ def get_sphere_membrane_center_and_density_from_radial_profile(radial_profile):
 
 def get_radial_profile_i_upper_limit(radial_profile):
     length = len(radial_profile)
-    i_upper_limit = round(length * 0.9)
+    i_upper_limit = round(length * 0.75)
     return i_upper_limit
 
 
@@ -1034,6 +1099,8 @@ def get_shift_between_images(reference_image, moving_image):
         shift, error, phasediff = skimage.registration.phase_cross_correlation(reference_image, moving_image)
     except ValueError:
         shift = np.zeros(3)
+        error = 0
+        phasediff = 0
         print("get_shift_between_images failed, shift set to 0,0,0")
     return shift, error, phasediff
 
@@ -1042,7 +1109,7 @@ def get_shift_of_sphere(image,origin=None):
     shift, error, phasediff = get_shift_between_images(average_image, image)
     return shift, error, phasediff
 
-def get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=2, max_cycles=10, max_shift_ratio=0.5):
+def get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=5, max_cycles=10, max_shift_ratio=0.5):
     image_box = extract_box_of_radius(image, rounded_centroid, radius + margin)
     max_shift = max_shift_ratio * np.linalg.norm(image_box.shape)
     total_shift = np.array((0,0,0))

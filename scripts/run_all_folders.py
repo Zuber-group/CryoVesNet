@@ -3,7 +3,7 @@ import warnings
 import os
 warnings.filterwarnings("ignore")
 os.environ["TF_CPP_MIN_LOG_LEVEL"]="2"
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+os.environ["CUDA_VISIBLE_DEVICES"]="3"
 
 import prepyto
 
@@ -22,15 +22,20 @@ dataset_directory = "/mnt/data/amin/treatment/"
 # dataset_directory = "
 # /mnt/data/amin/bad/"
 
+# dataset_directory = "/mnt/data/amin/bad/"
+
 
 def my_function(directory):
     pl = prepyto.Pipeline(directory)
     pl.network_size = 64
     pl.setup_prepyto_dir()
 
-    pl.run_deep(force_run=True, rescale=1.0)
-    pl.zoom(force_run=True, )
-    pl.label_vesicles(within_segmentation_region = True)
+    # pl.run_deep(force_run=True, rescale=1.0)
+    # pl.zoom(force_run=True, )
+    # pl.label_vesicles(within_segmentation_region = True)
+    pl.set_array('image')
+    pl.set_array('deep_mask')
+    pl.set_array('deep_labels')
     pl.label_vesicles_simply(within_segmentation_region = True, input_array_name="deep_mask")
     pl.make_spheres()
     pl.repair_spheres()

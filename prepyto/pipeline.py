@@ -308,23 +308,26 @@ class Pipeline():
         deep_labels = skimage.morphology.label(self.deep_mask > threshold)
         deep_labels= self.deep_labels
 
+        # ves_table = prepyto.vesicles_table(deep_labels)
+        # deep_labels = prepyto.collision_solver(self.deep_mask, deep_labels, ves_table, threshold, delta_size=1)
+
+
+        # ves_table = prepyto.vesicles_table(deep_labels)
+        # deep_labels,small_labels = prepyto.expand_small_labels(self.deep_mask , deep_labels, ves_table, self.min_vol, initial_threshold=threshold)
+
         ves_table = prepyto.vesicles_table(deep_labels)
         deep_labels = prepyto.collision_solver(self.deep_mask, deep_labels, ves_table, threshold, delta_size=1)
 
-
-        ves_table = prepyto.vesicles_table(deep_labels)
-        deep_labels,small_labels = prepyto.expand_small_labels(self.deep_mask , deep_labels, ves_table, self.min_vol, initial_threshold=threshold)
-
-        ves_table = prepyto.vesicles_table(deep_labels)
-        deep_labels = prepyto.remove_outliers(deep_labels, ves_table, self.min_vol)
+        # ves_table = prepyto.vesicles_table(deep_labels)
+        # deep_labels = prepyto.remove_outliers(deep_labels, ves_table, self.min_vol)
 
         # deep_labels, small_labels = prepyto.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol)
-        if len(small_labels):
-            print(
-                "The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
-            print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
-            print(small_labels)
-            deep_labels[np.isin(deep_labels, small_labels.index)] = 0
+        # if len(small_labels):
+        #     print(
+        #         "The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
+        #     print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
+        #     print(small_labels)
+        #     deep_labels[np.isin(deep_labels, small_labels.index)] = 0
 
         ves_table = prepyto.vesicles_table(deep_labels)
         deep_labels = prepyto.remove_outliers(deep_labels, ves_table, self.min_vol)
@@ -454,8 +457,8 @@ class Pipeline():
         mu = np.mean(radials, axis=0)
         corr_s = [spearmanr(x, mu)[0] for x in radials]
         sphere_df['corr'] = corr_s
-        #all_criteria = ['thickness','membrane density', 'lumen density', 'outer density','radius',
-        #                'lumen/membrane density', 'outer/membrane density', 'lumen/outer density']
+        all_criteria = ['thickness','membrane density', 'lumen density', 'outer density','radius',
+                       'lumen/membrane density', 'outer/membrane density', 'lumen/outer density']
         mahalanobis = prepyto.mahalanobis_distances(sphere_df[mahalanobis_criteria].copy())
         sphere_df['mahalanobis'] = mahalanobis
         sphere_df['p'] = 1 - chi2.cdf(sphere_df['mahalanobis'], len(mahalanobis_criteria))
@@ -477,13 +480,18 @@ class Pipeline():
         sphere_df.to_pickle(self.sphere_df_path)
         self.sphere_df = sphere_df
 
+        # mahalanobis_criteria = ['thickness', 'radius', 'membrane density']
+        # fixed, unfixed = self.refine_sphere_outliers('clean_deep_labels', mahalanobis_criteria=mahalanobis_criteria,
+        #                                          p_threshold=0.3, drop_unfixed=False)
+
     def refine_sphere_outliers(self, input_array_name='last_output_array_name',
                                mahalanobis_criteria=['thickness', 'membrane density', 'radius'],
-                               p_threshold=0.1, margin_search_range=range(0,5),
+                               p_threshold=0.1, margin_search_range=range(0,10),
                                drop_unfixed = True):
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
+        # self.set_array(input_array_name)
         sphere_df = self.sphere_df
         fixed_df = pd.DataFrame(data=None, columns=sphere_df.columns)
         unfixed_labels = []
@@ -503,6 +511,13 @@ class Pipeline():
                 lumen2membrane_density = lumen_density / membrane_density
                 outer2membrane_density = outer_density / membrane_density
                 lumen2outer_density = lumen_density / outer_density
+                if lumen2membrane_density == -0.0:
+                    lumen2membrane_density = 0
+                if outer2membrane_density == -0.0:
+                    outer2membrane_density = 0
+                if lumen2outer_density == -0.0:
+                    lumen2outer_density = 0
+                # print(sphere_df_copy.loc[label])
                 sphere_df_copy.loc[label] = [thickness,membrane_density,lumen_density,outer_density,new_radius,new_centroid,
                                              lumen2membrane_density,outer2membrane_density,lumen2outer_density,np.nan,
                                              np.nan,np.nan]
@@ -512,6 +527,7 @@ class Pipeline():
                 this_p = p[i]
                 if this_p > p_threshold:
                     fixed = True
+                    # print(sphere_df_copy.loc[label])
                     fixed_df.loc[label] = sphere_df_copy.loc[label].copy()
                     print(f"label {label} fixed.")
                     break
@@ -520,6 +536,10 @@ class Pipeline():
         if drop_unfixed: sphere_df.drop(labels=unfixed_labels, inplace=True)
         sphere_df.mahalanobis = prepyto.mahalanobis_distances(sphere_df[mahalanobis_criteria])
         sphere_df.p = 1 - chi2.cdf(sphere_df['mahalanobis'], len(mahalanobis_criteria))
+        # self.convex_labels = prepyto.make_vesicle_from_sphere_dataframe(getattr(self, input_array_name), sphere_df)
+        # print(len(sphere_df))
+        # prepyto.save_label_to_mrc(self.convex_labels, self.convex_labels_path, template_path=self.image_path)
+        # self.last_output_array_name = 'convex_labels'
         return fixed_df.index, unfixed_labels
 
 
@@ -528,6 +548,7 @@ class Pipeline():
         print("Prepyto Pipeline: Making vesicles spherical.")
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
+        print(input_array_name)
         self.set_array(input_array_name)
         self.compute_sphere_dataframe(input_array_name)
         self.sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(getattr(self, input_array_name), self.sphere_df)
@@ -537,7 +558,8 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
-    def repair_spheres(self, memkill=True, m=4, r=0):
+    def repair_spheres(self, memkill=True, m=10, r=0):
+        # there is huge problem, here we assume raduis column as specific
         self.set_array('cytomask')
         self.set_array('sphere_labels')
         # deep_labels = self.deep_labels.copy()
@@ -546,18 +568,52 @@ class Pipeline():
 
         sphere_df = pd.read_pickle(self.sphere_df_path)
         sphere_df['radius'] = sphere_df['radius'] + r
-        sphere_df = sphere_df[sphere_df['mahalanobis'] < m]
+        # sphere_df = sphere_df[sphere_df['mahalanobis'] < m]
         sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
 
         surround_labels = prepyto.surround_remover(sphere_labels, self.cytomask, self.min_vol)
         sphere_df.drop(surround_labels)
+        self.sphere_df=sphere_df
+
+
+        # mahalanobis_criteria = ['thickness', 'membrane density','lumen/membrane density']
+        # for i in range(10):
+        #     fixed, unfixed = self.refine_sphere_outliers('clean_deep_labels', mahalanobis_criteria=mahalanobis_criteria,p_threshold=0.3, drop_unfixed=False)
+        #     if len(fixed)==0:
+        #         break
+        #
+        # mahalanobis_criteria = ['thickness', 'membrane density', 'outer/membrane density']
+        # for i in range(10):
+        #     fixed, unfixed = self.refine_sphere_outliers('clean_deep_labels', mahalanobis_criteria=mahalanobis_criteria,p_threshold=0.3, drop_unfixed=False)
+        #     if len(fixed)==0:
+        #         break
+        #
+        mahalanobis_criteria = ['thickness', 'radius', 'membrane density']
+        for i in range(10):
+            fixed, unfixed = self.refine_sphere_outliers('clean_deep_labels', mahalanobis_criteria=mahalanobis_criteria,p_threshold=0.3, drop_unfixed=False)
+            if len(fixed)==0:
+                break
+
+        mahalanobis_criteria = ['thickness', 'radius', 'membrane density']
+        fixed, unfixed = self.refine_sphere_outliers('clean_deep_labels', mahalanobis_criteria=mahalanobis_criteria,p_threshold=0.3, drop_unfixed=True)
+
+        # mahalanobis_criteria = ['thickness', 'membrane density', 'outer/membrane density']
+        # fixed, unfixed = self.refine_sphere_outliers('clean_deep_labels', mahalanobis_criteria=mahalanobis_criteria,
+        #                                              p_threshold=0.5, drop_unfixed=True)
+        # mahalanobis_criteria = ['thickness', 'membrane density', 'lumen/membrane density']
+        # fixed, unfixed = self.refine_sphere_outliers('clean_deep_labels', mahalanobis_criteria=mahalanobis_criteria,
+        #                                              p_threshold=0.5, drop_unfixed=True)
+
 
         temp = prepyto.adjacent_vesicles(sphere_df)
+        # print(sphere_df.columns)
         edited = []
+
+
         # print(temp)
         while (len(temp) > 0):
             print("#############################################################################")
-            print(temp)
+            # print(temp)
             for x in temp:
                 # print(x)
                 # print("e",edited)
@@ -573,18 +629,19 @@ class Pipeline():
                     d = math.ceil(math.sqrt(sum((c1 - c2) ** 2)))
                     new_r1 = math.floor(d * (r1 / r3)) - 1
                     new_r2 = math.floor(d * (r2 / r3)) - 1
-                    print(sphere_df.iloc[p])
-                    sphere_df.iat[p, 2] = int(new_r1)
-                    print(sphere_df.iloc[p])
-                    sphere_df.iat[q, 2] = int(new_r2)
-                    print(r1, new_r1, r2, new_r2, d)
+                    # print(sphere_df.iloc[p])
+                    sphere_df.iat[p, sphere_df.columns.get_loc('radius')] = int(new_r1)
+                    # print(sphere_df.iloc[p])
+                    sphere_df.iat[q, sphere_df.columns.get_loc('radius')] = int(new_r2)
+                    # print(r1, new_r1, r2, new_r2, d)
                     edited.append(p)
                     edited.append(q)
+                    # print(edited)
                     # temp = np.delete(temp,np.where(temp==x))
                     # temp = np.delete(temp,np.where(temp==[q,p]))
             temp = prepyto.adjacent_vesicles(sphere_df)
             edited = []
-        print(temp)
+        # print(temp)
 
         # self.convex_labels = temp_best_corrected_labels
         self.convex_labels = prepyto.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
@@ -797,6 +854,7 @@ class Pipeline():
         visualization.viz_labels(self.image, [mask, corrected_labels], ['ground truth', 'New'])
 
     def object_evaluation(self, reference_path=None, prediction_path=None):
+        print("EVAL")
         self.set_array("cytomask")
         self.set_array("deep_mask")
         self.set_array("deep_labels")
