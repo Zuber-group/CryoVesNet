@@ -593,8 +593,6 @@ class Pipeline():
             fixed, unfixed = self.refine_sphere_outliers('clean_deep_labels', mahalanobis_criteria=mahalanobis_criteria,p_threshold=0.3, drop_unfixed=False)
             if len(fixed)==0:
                 break
-
-        mahalanobis_criteria = ['thickness', 'radius', 'membrane density']
         fixed, unfixed = self.refine_sphere_outliers('clean_deep_labels', mahalanobis_criteria=mahalanobis_criteria,p_threshold=0.3, drop_unfixed=True)
 
         # mahalanobis_criteria = ['thickness', 'membrane density', 'outer/membrane density']
@@ -916,9 +914,11 @@ class Pipeline():
         a0 = [evaluator1.former_dice(), evaluator2.former_dice(), evaluator3.former_dice(), evaluator4.former_dice(), evaluator5.former_dice()]
         a += a0
         for ppp in [0.0]:
-            a1 = prepyto.objectwise_evalution(reff, corrected_labels, proportion=ppp)
-            a2 = prepyto.objectwise_evalution(corrected_labels, reff, proportion=ppp)
-            a += a1
-            a += a2
+            # a1 = prepyto.objectwise_evalution(reff, corrected_labels, proportion=ppp)
+            # a2 = prepyto.objectwise_evalution(corrected_labels, reff, proportion=ppp)
+            a3 = prepyto.objectwise_evalution2(corrected_labels, reff, proportion=ppp)
+            # a += a1
+            # a += a2
+            a += a3
         self.clear_memory()
         return a

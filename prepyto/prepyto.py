@@ -357,9 +357,43 @@ def objectwise_evalution2(reff, prediction, delta_size=1, proportion=0.0):
         # print(pred_center)
         # print(predict_regions['label'][i])
         # print(reff[pred_center])
+        p = int(round(
+            (predict_regions['bbox-3'][i] - predict_regions['bbox-0'][i])))
+        q = int(round(
+            (predict_regions['bbox-4'][i] - predict_regions['bbox-1'][i])))
+        r = int(round(
+            (predict_regions['bbox-5'][i] - predict_regions['bbox-2'][i])))
+        predicted_diameter = np.max([p, q, r])
+
 
         if reff[pred_center] != 0:
+            related_label=reff[pred_center]
             TP = TP+1
+            index_related_label = np.where(reff_regions['label'] == related_label)[0][0]
+
+            p = int(round(
+                (reff_regions['bbox-3'][index_related_label] - reff_regions['bbox-0'][index_related_label])))
+            q = int(round(
+                (reff_regions['bbox-4'][index_related_label] - reff_regions['bbox-1'][index_related_label])))
+            r = int(round(
+                (reff_regions['bbox-5'][index_related_label] - reff_regions['bbox-2'][index_related_label])))
+
+            reff_diameter = np.max([p, q, r])
+
+            reff_center = np.array([reff_regions['centroid-0'][index_related_label],
+                                reff_regions['centroid-1'][index_related_label],
+                                reff_regions['centroid-2'][index_related_label]])
+
+            a = min(reff_diameter, predicted_diameter)
+            b = max(reff_diameter, predicted_diameter)
+            c = 1 - a / b
+
+            all += [[predict_regions['label'][i], related_label, reff_diameter, predicted_diameter, c,
+                     math.sqrt(sum((reff_center - pred_center) ** 2))]]
+
+
+
+
 
         else:
             FP = FP + 1
@@ -404,8 +438,9 @@ def objectwise_evalution2(reff, prediction, delta_size=1, proportion=0.0):
     print(TP)
     print(FN)
     print(FP)
+    tab = np.array(all)
 
-    important = [evaluator.former_dice(), len(reff_regions['label']), TP, FN , FP]
+    important = [evaluator.former_dice(), len(reff_regions['label']), len(predict_regions['label']),TP, FN , FP, np.mean(tab[:, 4]),np.mean(tab[:, 5]),np.std(tab[:, 5])]
     return important
 
 
