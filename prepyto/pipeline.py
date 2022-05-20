@@ -68,6 +68,7 @@ class Pipeline():
         self.convex_labels_path = self.save_dir / (self.image_path.stem + '_convex_labels.mrc')
         self.mancorr_labels_path = self.save_dir / (self.image_path.stem + '_mancorr.mrc')
         self.sphere_labels_path = self.save_dir / (self.image_path.stem + '_sphere.mrc')
+        self.good_labels_path = self.save_dir / (self.image_path.stem + '_good.mrc')
         self.sphere_df_path = self.save_dir / (self.image_path.stem + '_sphere_dataframe.pkl')
         self.no_small_labels_path = self.save_dir / (self.image_path.stem + '_no_small_labels.mrc')
         self.final_vesicle_labels_path = self.save_dir / (self.image_path.stem + '_final_vesicle_labels.mrc')
@@ -84,13 +85,14 @@ class Pipeline():
         self.clean_deep_labels = None
         self.deep_labels = None  # placeholder for cleaned label array
         self.threshold_tuned_labels = None  # placeholder for threshold tuned label array
+        self.good_labels = None
         self.convex_labels = None
         self.mancorr_labels = None
         self.sphere_labels = None
         self.no_small_labels = None
         self.final_vesicle_labels = None
         self.full_labels = None
-        self.garbage_collector = {'image', 'binned_deep_mask', 'deep_mask', 'cytomask',
+        self.garbage_collector = {'image', 'binned_deep_mask', 'deep_mask', 'cytomask', 'good_labels',
                                   'active_zone_mask', 'deep_labels','clean_deep_labels',
                                   'threshold_tuned_labels', 'convex_labels', 'mancorr_labels', 'sphere_labels',
                                   'no_small_labels', 'final_vesicle_labels'}
@@ -558,7 +560,7 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
-    def repair_spheres(self, memkill=True, m=10, r=0):
+    def repair_spheres(self, memkill=True, p_threshold=0.3, r=0):
         # there is huge problem, here we assume raduis column as specific
         self.set_array('cytomask')
         self.set_array('sphere_labels')
@@ -667,6 +669,7 @@ class Pipeline():
         points_to_remove, points_to_add, points_to_add_sizes = visualization.add_points_remove_labels(self,
                                                                                                       getattr(self,
                                                                                                               input_array_name))
+        print(points_to_remove)
         minimum_box_size = self.voxel_size * 50
         self.mancorr_labels = prepyto.remove_labels_under_points(getattr(self, input_array_name), points_to_remove)
         self.mancorr_labels = prepyto.add_sphere_labels_under_points(self.image, self.mancorr_labels, points_to_add,
@@ -890,17 +893,22 @@ class Pipeline():
         real_image = self.image
         reff = reference.data
         reff = reff * self.cytomask
+        # print(np.unique(reff))
         print(np.shape(reff))
-        reff = reff >= 10
+        temp= np.where(reff<10)
+        reff[temp]=0
+        # reff = reff >= 10
+        # print(np.unique(reff))
 
         # corrected_labels = prediction.data
         # corrected_labels = skimage.morphology.label(corrected_labels, connectivity=1)
-        evaluator1 = evaluation_class.ConfusionMatrix(self.deep_mask, reff)
-        evaluator2 = evaluation_class.ConfusionMatrix(self.deep_labels >= 1, reff)
-        evaluator3 = evaluation_class.ConfusionMatrix(self.clean_deep_labels >= 1, reff)
-        evaluator4 = evaluation_class.ConfusionMatrix(self.sphere_labels >= 1, reff)
-        evaluator5 = evaluation_class.ConfusionMatrix(self.convex_labels >= 1, reff)
+        evaluator1 = evaluation_class.ConfusionMatrix(self.deep_mask, reff>=10)
+        evaluator2 = evaluation_class.ConfusionMatrix(self.deep_labels >= 1, reff>=10)
+        evaluator3 = evaluation_class.ConfusionMatrix(self.clean_deep_labels >= 1, reff>=10)
+        evaluator4 = evaluation_class.ConfusionMatrix(self.sphere_labels >= 1, reff>=10)
+        evaluator5 = evaluation_class.ConfusionMatrix(self.convex_labels >= 1, reff>=10)
         # print(evaluator)
+
 
         print(evaluator1.former_dice())
         print(evaluator2.former_dice())
@@ -908,7 +916,7 @@ class Pipeline():
         print(evaluator4.former_dice())
         print(evaluator5.former_dice())
 
-        reff = skimage.morphology.label(reff, connectivity=1)
+        # reff = skimage.morphology.label(reff, connectivity=1)
 
         a = []
         a0 = [evaluator1.former_dice(), evaluator2.former_dice(), evaluator3.former_dice(), evaluator4.former_dice(), evaluator5.former_dice()]
@@ -916,9 +924,13 @@ class Pipeline():
         for ppp in [0.0]:
             # a1 = prepyto.objectwise_evalution(reff, corrected_labels, proportion=ppp)
             # a2 = prepyto.objectwise_evalution(corrected_labels, reff, proportion=ppp)
-            a3 = prepyto.objectwise_evalution2(corrected_labels, reff, proportion=ppp)
+            # a3 = prepyto.objectwise_evalution2(corrected_labels , reff, proportion=ppp)
+            a3,good = prepyto.objectwise_evalution3(reff, corrected_labels, proportion=ppp)
+            # a3 = prepyto.objectwise_evalution3( corrected_labels, reff, proportion=ppp)
             # a += a1
             # a += a2
             a += a3
-        self.clear_memory()
+        prepyto.save_label_to_mrc(good, self.good_labels_path, template_path=self.image_path)
+        # self.clear_memory()
+
         return a

@@ -18,7 +18,7 @@ def add_points_remove_labels(pipe, labels_to_analyze, additional_labels=None ):
     def print_message(viewer):
         print('Save procedures')
         yield
-        minimum_box_size = pipe.voxel_size * 50
+        minimum_box_size = pipe.voxel_size * 10
         pipe.mancorr_labels = prepyto.remove_labels_under_points(labels_to_analyze, points_to_remove_layer.data)
         pipe.mancorr_labels = prepyto.add_sphere_labels_under_points(pipe.image, pipe.mancorr_labels, points_to_add_layer.data,
                                                                      points_to_add_layer.size[:,1], minimum_box_size)

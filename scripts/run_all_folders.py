@@ -17,7 +17,7 @@ import numpy as np
 
 dataset_directory = "/mnt/data/amin/Handpicked/"
 # dataset_directory = "/mnt/data/amin/ctrl/"
-# dataset_directory = "/mnt/data/amin/treatment/"
+dataset_directory = "/mnt/data/amin/treatment/"
 # dataset_directory = "/mnt/data/amin/bad/"
 # dataset_directory = "
 # /mnt/data/amin/bad/"
@@ -41,8 +41,8 @@ def my_function(directory):
     pl.repair_spheres()
     # pl.clear_memory()
     res=pl.object_evaluation(reference_path='labels_out.mrc')
-    # pl.make_full_modfile(input_array_name='convex_labels')
-    # pl.make_full_label_file()
+    pl.make_full_modfile(input_array_name='convex_labels')
+    pl.make_full_label_file()
     return res
 
 

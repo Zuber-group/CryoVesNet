@@ -444,6 +444,136 @@ def objectwise_evalution2(reff, prediction, delta_size=1, proportion=0.0):
     return important
 
 
+
+def objectwise_evalution3(reff, prediction, delta_size=1, proportion=0.0):
+    reff = reff.copy()
+    print(len(np.unique(reff)))
+
+    prediction = prediction.copy()
+    reff_regions = skimage.measure.regionprops_table(reff, properties=('centroid', 'label', 'bbox'))
+    print((reff_regions))
+    good = np.zeros(np.array(prediction).shape).astype(np.int16)
+    predict_regions = skimage.measure.regionprops_table(prediction, properties=('centroid', 'label', 'bbox'))
+    all = []
+    TP = 0
+    FP = 0
+    FN = 0
+    print(np.shape(reff))
+    for i in range(0, len(predict_regions['label'])):
+        pred_center = (int(predict_regions['centroid-0'][i]), int(predict_regions['centroid-1'][i]), int(predict_regions['centroid-2'][i]))
+
+        # print(pred_center)
+        # print(predict_regions['label'][i])
+        # print(reff[pred_center])
+        p = int(round(
+            (predict_regions['bbox-3'][i] - predict_regions['bbox-0'][i])))
+        q = int(round(
+            (predict_regions['bbox-4'][i] - predict_regions['bbox-1'][i])))
+        r = int(round(
+            (predict_regions['bbox-5'][i] - predict_regions['bbox-2'][i])))
+        predicted_diameter = np.max([p, q, r])
+
+        related_label = reff[pred_center]
+        if related_label == 0:
+            FP = FP + 1
+            qx, qy, qz = np.where(prediction == predict_regions['label'][i])
+            prediction[qx, qy, qz] = 0
+            # print(predict_regions['label'][i])
+
+
+        else:
+
+            index_related_label = np.where(reff_regions['label'] == related_label)[0][0]
+
+            p = int(round(
+                (reff_regions['bbox-3'][index_related_label] - reff_regions['bbox-0'][index_related_label])))
+            q = int(round(
+                (reff_regions['bbox-4'][index_related_label] - reff_regions['bbox-1'][index_related_label])))
+            r = int(round(
+                (reff_regions['bbox-5'][index_related_label] - reff_regions['bbox-2'][index_related_label])))
+
+            reff_diameter = np.max([p, q, r])
+
+            reff_center = np.array([reff_regions['centroid-0'][index_related_label],
+                                    reff_regions['centroid-1'][index_related_label],
+                                    reff_regions['centroid-2'][index_related_label]])
+
+            a = min(reff_diameter, predicted_diameter)
+            b = max(reff_diameter, predicted_diameter)
+            c = 1 - a / b
+            temp = (reff_center - pred_center)**2
+            d = math.sqrt(sum(temp))
+            # print(d,temp)
+
+            qx, qy, qz = np.where(prediction == predict_regions['label'][i])
+            px, py, pz = np.where(reff == reff_regions['label'][index_related_label])
+            prediction[qx, qy, qz] = 0
+            # if (d <= predicted_diameter / 2):
+            if (d <= reff_diameter/2) and (d <= predicted_diameter/2):
+                # print(d)
+                # px, py, pz = np.where(reff == reff_regions['label'][index_related_label])
+                reff[px, py, pz] = 0
+                # good[qx, qy, qz] = predict_regions['label'][i]
+
+
+                TP = TP + 1
+                all += [[predict_regions['label'][i], related_label, reff_diameter, predicted_diameter, c, d]]
+                # print(pred_center,reff_center)
+                # print(predict_regions['label'][i], d, reff_diameter / 2, predicted_diameter / 2)
+            else:
+                # print(d)
+                # qx, qy, qz = np.where(prediction == predict_regions['label'][i])
+                # prediction[qx, qy, qz] = 0
+                FP = FP + 1
+                # print(pred_center,reff_center)
+                # print(predict_regions['label'][i], d, reff_diameter/2, predicted_diameter/2)
+                good[px, py, pz] = reff_regions['label'][index_related_label]
+
+
+    aa= len(reff_regions['label'])
+    reff_regions = skimage.measure.regionprops_table(reff, properties=('centroid', 'label', 'bbox'))
+    for i in range(0, len(reff_regions['label'])):
+
+        sub_old_label = reff[
+                        reff_regions['bbox-0'][i] - delta_size: reff_regions['bbox-3'][i] + delta_size + 1,
+                        reff_regions['bbox-1'][i] - delta_size: reff_regions['bbox-4'][i] + delta_size + 1,
+                        reff_regions['bbox-2'][i] - delta_size: reff_regions['bbox-5'][i] + delta_size + 1]
+        sub_new_label = prediction[
+                        reff_regions['bbox-0'][i] - delta_size: reff_regions['bbox-3'][i] + delta_size + 1,
+                        reff_regions['bbox-1'][i] - delta_size: reff_regions['bbox-4'][i] + delta_size + 1,
+                        reff_regions['bbox-2'][i] - delta_size: reff_regions['bbox-5'][i] + delta_size + 1]
+
+        sub_old_label_mask = sub_old_label == reff_regions['label'][i]
+
+        px, py, pz = np.where(sub_old_label_mask)
+        areaOfPrediction = sub_new_label[px, py, pz]
+
+        unique, counts = np.unique(areaOfPrediction, return_counts=True)
+        # print(unique)
+        # print(counts)
+        areaOfPrediction = np.delete(areaOfPrediction, np.where(areaOfPrediction == 0))
+        # (filter(lambda a: a != 2, areaOfPrediction))
+        unique, counts = np.unique(areaOfPrediction, return_counts=True)
+        # print(unique,counts)
+        if len(unique) == 0:
+            FN= FN+1
+            qx, qy, qz = np.where(reff == reff_regions['label'][i])
+            reff[qx, qy, qz] = 0
+
+    evaluator = evaluation_class.ConfusionMatrix(good > 0 , reff > 0)
+    # print(np.unique(good))
+    print(evaluator.former_dice())
+    print(len(reff_regions['label']))
+    print(len(predict_regions['label']))
+    print(TP)
+    print(FN)
+    print(FP)
+    tab = np.array(all)
+
+    important = [evaluator.former_dice(), aa, len(predict_regions['label']),TP, FP , FN, np.mean(tab[:, 4]),np.mean(tab[:, 5]),np.std(tab[:, 5])]
+    return important,good
+
+
 def oneToOneCorrection(old_label, new_label, delta_size=3):
     """
     this function give 2 label map OLD and NEW
@@ -785,6 +915,8 @@ def add_sphere_labels_under_points(image, image_labels, points_to_add,
             get_sphere_parameters(image, label, 5, radius, rounded_centroid)
         if keep_label:
             put_spherical_label_in_array(corrected_labels, new_centroid, new_radius, label, inplace = True)
+        else:
+            print("SOMTHING WENT WRONG!")
     return corrected_labels
 
 def get_labels_from_regions(vesicle_regions):
