@@ -445,13 +445,14 @@ def objectwise_evalution2(reff, prediction, delta_size=1, proportion=0.0):
 
 
 
-def objectwise_evalution3(reff, prediction, delta_size=1, proportion=0.0):
+def objectwise_evalution3(reff, prediction,  img, vx ,delta_size=1):
+    reff2= reff.copy()
     reff = reff.copy()
     print(len(np.unique(reff)))
 
     prediction = prediction.copy()
     reff_regions = skimage.measure.regionprops_table(reff, properties=('centroid', 'label', 'bbox'))
-    print((reff_regions))
+    # print((reff_regions))
     good = np.zeros(np.array(prediction).shape).astype(np.int16)
     predict_regions = skimage.measure.regionprops_table(prediction, properties=('centroid', 'label', 'bbox'))
     all = []
@@ -513,7 +514,7 @@ def objectwise_evalution3(reff, prediction, delta_size=1, proportion=0.0):
                 # print(d)
                 # px, py, pz = np.where(reff == reff_regions['label'][index_related_label])
                 reff[px, py, pz] = 0
-                # good[qx, qy, qz] = predict_regions['label'][i]
+                good[qx, qy, qz] = predict_regions['label'][i]
 
 
                 TP = TP + 1
@@ -527,7 +528,7 @@ def objectwise_evalution3(reff, prediction, delta_size=1, proportion=0.0):
                 FP = FP + 1
                 # print(pred_center,reff_center)
                 # print(predict_regions['label'][i], d, reff_diameter/2, predicted_diameter/2)
-                good[px, py, pz] = reff_regions['label'][index_related_label]
+                # good[px, py, pz] = reff_regions['label'][index_related_label]
 
 
     aa= len(reff_regions['label'])
@@ -556,11 +557,25 @@ def objectwise_evalution3(reff, prediction, delta_size=1, proportion=0.0):
         unique, counts = np.unique(areaOfPrediction, return_counts=True)
         # print(unique,counts)
         if len(unique) == 0:
-            FN= FN+1
+            rounded_centroid = (int(reff_regions['centroid-0'][i]), int(reff_regions['centroid-1'][i]),
+                           int(reff_regions['centroid-2'][i]))
+            old_radius = abs(reff_regions['bbox-0'][i] - reff_regions['bbox-3'][i])/2
+            FN = FN+1
             qx, qy, qz = np.where(reff == reff_regions['label'][i])
             reff[qx, qy, qz] = 0
+            reff2[qx, qy, qz] = 0
 
-    evaluator = evaluation_class.ConfusionMatrix(good > 0 , reff > 0)
+            membrane_density, keep_label, new_centroid, new_radius, thickness, radial, lumen_density, outer_density = \
+                get_sphere_parameters(img, 1, 5, vx*25, rounded_centroid)
+
+            if keep_label and np.linalg.norm(new_centroid-rounded_centroid)<old_radius and abs(old_radius-new_radius)<old_radius/2:
+                put_spherical_label_in_array(good, new_centroid, new_radius, FN+len(predict_regions['label']), inplace=True)
+            else:
+                good[qx, qy, qz] = FN + len(predict_regions['label'])
+                print(keep_label,rounded_centroid,old_radius)
+                print(new_centroid, new_radius,np.linalg.norm(new_centroid-rounded_centroid))
+
+    evaluator = evaluation_class.ConfusionMatrix(good >= 1 , reff2 >= 1)
     # print(np.unique(good))
     print(evaluator.former_dice())
     print(len(reff_regions['label']))
@@ -816,6 +831,7 @@ def vesicles_table(labels):
 
 def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1):
     collision_ves = ves_table[(ves_table['extent'] < 0.25) & (ves_table['area_zscore'] > 1)]
+    # collision_ves = ves_table[(ves_table['extent'] < 0.48) & (ves_table['area_zscore'] > 1.5)]
     print(collision_ves)
     old_mask = deep_mask.copy()
     old_label = deep_labels.copy()
@@ -936,7 +952,7 @@ def get_centroids_from_regions(vesicle_regions):
 
 
 
-def     remove_outliers(deep_labels,ves_table, min_vol ):
+def remove_outliers(deep_labels,ves_table, min_vol ):
     new_label = deep_labels.copy()
     verysmall_vesicles = ves_table[(ves_table['extent'] < 0.25 ) | (ves_table['extent'] > 0.75) | (ves_table['area'] < 1* min_vol)]
     verysmall_vesicles = verysmall_vesicles.set_index('label')
@@ -953,10 +969,10 @@ def surround_remover(deep_labels,mask,t):
     mask_invert = 1 - (mask)
     extra = deep_labels_temp * mask_invert
     extra_labels , counts= np.unique(extra, return_counts=True)
-    extra_labels = (extra_labels[counts > t])
+    extra_labels = (extra_labels[counts > t/2])
     extra_labels = extra_labels.tolist()
     extra_labels.remove(0)
-    print(extra_labels)
+    print("outside: ",extra_labels)
 
     # for i in extra_labels:
     #     if i == 0:

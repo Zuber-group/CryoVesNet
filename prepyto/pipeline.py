@@ -145,7 +145,7 @@ class Pipeline():
 
     def set_active_zone_array_from_mod(self, datatype=np.uint8, force_generate=False):
         if (not self.active_zone_mask_path.exists()) or force_generate:
-            cmd = f"imodmop -mode 6 -o 1 -tube 1 -diam 3 -pl -mask 1 \"{self.active_zone_mod_path}\" \"{self.image_path}\" \"{self.active_zone_mask_path}\""
+            cmd = f"imodmop -mode 1 -o 1 -tube 1 -diam 3 -pl -mask 1 \"{self.active_zone_mod_path}\" \"{self.image_path}\" \"{self.active_zone_mask_path}\""
             os.system(cmd)
         self.set_array('active_zone_mask', datatype=datatype)
 
@@ -318,8 +318,8 @@ class Pipeline():
         # deep_labels,small_labels = prepyto.expand_small_labels(self.deep_mask , deep_labels, ves_table, self.min_vol, initial_threshold=threshold)
 
         ves_table = prepyto.vesicles_table(deep_labels)
+        # print(ves_table)
         deep_labels = prepyto.collision_solver(self.deep_mask, deep_labels, ves_table, threshold, delta_size=1)
-
         # ves_table = prepyto.vesicles_table(deep_labels)
         # deep_labels = prepyto.remove_outliers(deep_labels, ves_table, self.min_vol)
 
@@ -574,8 +574,11 @@ class Pipeline():
         sphere_labels = prepyto.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
 
         surround_labels = prepyto.surround_remover(sphere_labels, self.cytomask, self.min_vol)
-        sphere_df.drop(surround_labels)
+        print(sphere_df)
+        print(len(sphere_df))
+        sphere_df = sphere_df.drop(surround_labels)
         self.sphere_df=sphere_df
+        print(len(sphere_df))
 
 
         # mahalanobis_criteria = ['thickness', 'membrane density','lumen/membrane density']
@@ -895,18 +898,18 @@ class Pipeline():
         reff = reff * self.cytomask
         # print(np.unique(reff))
         print(np.shape(reff))
-        temp= np.where(reff<10)
-        reff[temp]=0
+        # temp= np.where(reff<10)
+        # reff[temp]=0
         # reff = reff >= 10
         # print(np.unique(reff))
 
         # corrected_labels = prediction.data
         # corrected_labels = skimage.morphology.label(corrected_labels, connectivity=1)
-        evaluator1 = evaluation_class.ConfusionMatrix(self.deep_mask, reff>=10)
-        evaluator2 = evaluation_class.ConfusionMatrix(self.deep_labels >= 1, reff>=10)
-        evaluator3 = evaluation_class.ConfusionMatrix(self.clean_deep_labels >= 1, reff>=10)
-        evaluator4 = evaluation_class.ConfusionMatrix(self.sphere_labels >= 1, reff>=10)
-        evaluator5 = evaluation_class.ConfusionMatrix(self.convex_labels >= 1, reff>=10)
+        evaluator1 = evaluation_class.ConfusionMatrix(self.deep_mask, reff>= 1)
+        evaluator2 = evaluation_class.ConfusionMatrix(self.deep_labels >= 1, reff>= 1)
+        evaluator3 = evaluation_class.ConfusionMatrix(self.clean_deep_labels >= 1, reff>= 1)
+        evaluator4 = evaluation_class.ConfusionMatrix(self.sphere_labels >= 1, reff>= 1)
+        evaluator5 = evaluation_class.ConfusionMatrix(self.convex_labels >= 1, reff>= 1)
         # print(evaluator)
 
 
@@ -925,7 +928,7 @@ class Pipeline():
             # a1 = prepyto.objectwise_evalution(reff, corrected_labels, proportion=ppp)
             # a2 = prepyto.objectwise_evalution(corrected_labels, reff, proportion=ppp)
             # a3 = prepyto.objectwise_evalution2(corrected_labels , reff, proportion=ppp)
-            a3,good = prepyto.objectwise_evalution3(reff, corrected_labels, proportion=ppp)
+            a3,good = prepyto.objectwise_evalution3(reff, corrected_labels,self.image,self.voxel_size)
             # a3 = prepyto.objectwise_evalution3( corrected_labels, reff, proportion=ppp)
             # a += a1
             # a += a2
