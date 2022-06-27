@@ -576,7 +576,7 @@ class Pipeline():
         surround_labels = prepyto.surround_remover(sphere_labels, self.cytomask, self.min_vol)
         print(sphere_df)
         print(len(sphere_df))
-        sphere_df = sphere_df.drop(surround_labels)
+        sphere_df.drop(surround_labels, inplace=True)
         self.sphere_df=sphere_df
         print(len(sphere_df))
 
