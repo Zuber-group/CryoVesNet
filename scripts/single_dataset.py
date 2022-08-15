@@ -2,7 +2,7 @@ import warnings
 import os
 warnings.filterwarnings("ignore")
 os.environ["TF_CPP_MIN_LOG_LEVEL"]="2"
-os.environ["CUDA_VISIBLE_DEVICES"]="3"
+os.environ["CUDA_VISIBLE_DEVICES"]="2"
 
 import prepyto
 from prepyto import visualization
@@ -18,28 +18,30 @@ import numpy as np
 
 # dataset_directory = "/mnt/data/amin/Handpicked/133/"
 # dataset_directory = "/mnt/data/amin/ctrl/7"
-# dataset_directory = "/mnt/data/amin/treatment/5"
-dataset_directory = "/mnt/data/amin/cleaned/2"
+# dataset_directory = "/mnt/data/amin/treatment/1"
+dataset_directory = "/mnt/data/amin/cleaned/133"
 
 pl2 = prepyto.Pipeline(dataset_directory)
 pl2.network_size=64
 pl2.setup_prepyto_dir()
 
 
-pl2.set_array('image')
-pl2.set_array('deep_mask')
-pl2.set_array('deep_labels')
-pl2.set_array('clean_deep_labels')
-pl2.set_array('sphere_labels')
+# pl2.set_array('image')
+# pl2.set_array('deep_mask')
+# pl2.set_array('deep_labels')
+# pl2.set_array('clean_deep_labels')
+# pl2.set_array('sphere_labels')
 # pl2.set_array('convex_labels')
-pl2.repair_spheres()
+# pl2.repair_spheres()
+# pl2.crush_solver()
 # pl2.run_deep(force_run=True, rescale=1.0)
 # pl2.zoom(force_run=True,)
 # pl2.label_vesicles(within_segmentation_region=True)
 # ves=pl2.label_vesicles_simply(within_segmentation_region =True)
 # pl2.make_spheres()
 # pl2.repair_spheres(p_threshold=0.3)
-# pl2.object_evaluation(reference_path='labels_out.mrc')
+# res = pl2.object_evaluation(reference_path='new_labels_out.mrc')
+# pl2.crush_solver()
 #
 # pl2.make_full_modfile(input_array_name='convex_labels')
 # pl2.make_full_label_file()
@@ -49,17 +51,25 @@ pl2.repair_spheres()
 # t=pl2.object_evaluation()
 # # #
 # res= pl2.object_evaluation(reference_path='new_labels_out.mrc')
-# pl2.set_array('image')
-# pl2.set_array('cytomask')
-# pl2.set_array('deep_mask')
-# pl2.set_array('deep_labels')
-# pl2.set_array('clean_deep_labels')
-# pl2.set_array('sphere_labels')
-# pl2.set_array('convex_labels')
+pl2.set_array('image')
+pl2.set_array('cytomask')
+pl2.set_array('deep_mask')
+pl2.set_array('deep_labels')
+pl2.set_array('clean_deep_labels')
+pl2.set_array('sphere_labels')
+pl2.set_array('convex_labels')
+pl2.set_array('good_labels')
+#
+#
+
 # pl2.set_array('good_labels')
+res= pl2.object_evaluation(reference_path='new_labels_out.mrc')
+pl2.crush_solver('good_labels')
+pl2.make_full_modfile(input_array_name='good_labels',memkill=False,q=-1)
+pl2.make_full_label_file(memkill=False, q=-1)
 # #
 # #
-# res= pl2.object_evaluation(reference_path='new_labels_out.mrc')
+# # res= pl2.object_evaluation(reference_path='new_labels_out.mrc')
 # pl2.set_array('good_labels')
 # reference_path='new_labels_out.mrc'
 # reference_path = pl2.dir / reference_path

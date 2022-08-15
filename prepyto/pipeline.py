@@ -25,7 +25,9 @@ import mrcfile
 from tqdm import tqdm
 from scipy.stats import chi2, pearsonr, spearmanr
 from collections.abc import Iterable
-
+from skimage.segmentation import watershed
+from skimage.feature import peak_local_max
+from scipy import ndimage as ndi
 try:
     import tensorflow.compat.v1 as tf
 
@@ -761,7 +763,7 @@ class Pipeline():
                                   template_path=self.image_path, q=q)
         self.last_output_array_name = 'final_vesicle_labels'
         self.print_output_info()
-        cmd0 = f"imodauto -f 3 -m 4 -h 0 -O 10 \"{self.final_vesicle_labels_path}\" \"{self.vesicle_mod_path}\""
+        cmd0 = f"imodauto -f 0 -m 4 -h 0 -O 10 \"{self.final_vesicle_labels_path}\" \"{self.vesicle_mod_path}\""
         cmd1 = f"imodjoin -c \"{self.cell_outline_mod_path}\" \"{self.active_zone_mod_path}\" \"{self.vesicle_mod_path}\" \"{self.full_mod_path}\""
         os.system(cmd0)
         print("next:")
@@ -857,6 +859,83 @@ class Pipeline():
         print("Former Dice: " + str(evaluator.former_dice()))
         visualization.viz_labels(self.image, [mask, corrected_labels], ['ground truth', 'New'])
 
+    def crush_solver(self, input_array_name='last_output_array_name'):
+        if input_array_name == 'last_output_array_name':
+            input_array_name = self.last_output_array_name
+        self.set_array(input_array_name)
+        reff= getattr(self, input_array_name)
+        self.set_array('cytomask')
+
+        reff = reff * self.cytomask
+        reff = reff.astype(np.uint16)
+        # temp= np.where(reff<10)
+        # reff[temp]=0
+        reff = (reff >= 1).astype(np.uint16)
+        reff = skimage.measure.label(reff, connectivity=1)
+
+        orig_reff = reff.copy()
+        measures = skimage.measure.regionprops_table(reff, properties=('label', 'extent', 'bbox', 'area'))
+        measures_pd = pd.DataFrame(measures)
+        connected_vesicles = measures_pd[(measures_pd['extent'] < 0.44)]
+        delta_size = 1
+
+        # connected_vesicles = connected_vesicles.set_index('label')
+        print((connected_vesicles['label']))
+        for i, row in connected_vesicles.iterrows():
+            sub_old_label = reff[
+                            connected_vesicles['bbox-0'][i] - delta_size: connected_vesicles['bbox-3'][
+                                                                              i] + delta_size + 1,
+                            connected_vesicles['bbox-1'][i] - delta_size: connected_vesicles['bbox-4'][
+                                                                              i] + delta_size + 1,
+                            connected_vesicles['bbox-2'][i] - delta_size: connected_vesicles['bbox-5'][
+                                                                              i] + delta_size + 1]
+            # sub_new_label = prediction[
+            #                 measures['bbox-0'][i] - delta_size: measures['bbox-3'][i] + delta_size + 1,
+            #                 measures['bbox-1'][i] - delta_size: measures['bbox-4'][i] + delta_size + 1,
+            #                 measures['bbox-2'][i] - delta_size: measures['bbox-5'][i] + delta_size + 1]
+
+            # reff[pxj, pyj, pzj] = 0
+            pxj, pyj, pzj = np.where(sub_old_label != connected_vesicles['label'][i])
+            temp = sub_old_label[pxj, pyj, pzj]
+            sub_old_label_mask = sub_old_label == connected_vesicles['label'][i]
+
+            measure_label, nc = skimage.measure.label(sub_old_label_mask, return_num=True)
+            # , properties = ('label', 'extent', 'bbox', 'centroid')
+            # print(nc)
+
+            distance = ndi.distance_transform_edt(sub_old_label_mask)
+            coords = peak_local_max(distance, footprint=np.ones((7, 7, 7)), labels=sub_old_label_mask)
+            mask = np.zeros(distance.shape, dtype=bool)
+            mask[tuple(coords.T)] = True
+            markers, _ = ndi.label(mask)
+            labels = watershed(-distance, markers, mask=sub_old_label_mask)
+
+            # measure_label, nc = skimage.measure.label(sub_old_label_mask, return_num=True)
+            # , properties = ('label', 'extent', 'bbox', 'centroid')
+
+            labels[pxj, pyj, pzj] = temp
+            reff[
+            connected_vesicles['bbox-0'][i] - delta_size: connected_vesicles['bbox-3'][i] + delta_size + 1,
+            connected_vesicles['bbox-1'][i] - delta_size: connected_vesicles['bbox-4'][i] + delta_size + 1,
+            connected_vesicles['bbox-2'][i] - delta_size: connected_vesicles['bbox-5'][i] + delta_size + 1] = labels
+            # print(np.unique(labels))
+
+        reff = skimage.measure.label(reff, connectivity=3)
+        reff = reff.astype(np.uint16)
+
+        measures_x = skimage.measure.regionprops_table(reff, properties=('label', 'extent', 'bbox', 'area'))
+        measures_pd_x = pd.DataFrame(measures_x)
+        connected_vesicles_x = measures_pd_x[(measures_pd_x['extent'] < 0.44)]
+        print((connected_vesicles_x['label']))
+        if ((connected_vesicles_x.shape[0]) == 0):
+            print("Solved!")
+
+            prepyto.save_label_to_mrc(reff, self.good_labels_path, template_path=self.image_path)
+            # self.last_output_array_name = 'good_labels'
+        # self.print_output_info()
+        return reff
+
+
     def object_evaluation(self, reference_path=None, prediction_path=None):
         print("EVAL")
         self.set_array("cytomask")
@@ -898,6 +977,7 @@ class Pipeline():
         reff = reff * self.cytomask
         # print(np.unique(reff))
         print(np.shape(reff))
+        reff = reff.astype(np.uint16)
         # temp= np.where(reff<10)
         # reff[temp]=0
         # reff = reff >= 10

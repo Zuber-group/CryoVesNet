@@ -31,8 +31,9 @@ directories = [dataset_directory+x+'/' for x in folders]
 
 print("files")
 print(directories)
-directories=["/mnt/data/amin/cleaned/1/"]
+directories=["/mnt/data/amin/cleaned/84/"]
 t=0
+
 for j in directories:
     os.chdir(j)
     print(j)# Change working Directory
@@ -40,9 +41,14 @@ for j in directories:
     pl2.network_size=64
     pl2.setup_prepyto_dir()
 
-    reference_path='31_rotx-bin-trim.nad.rec_final_vesicle_labels.mrc'
-    result_path='31_rotx-bin-trim.nad.rec_final_vesicle_labels.mrc'
-    reference_path = pl2.save_dir / reference_path
+    reference_path='labels_out.mrc'
+    result_path=   'new_labels_out.mrc'
+
+    # reference_path = 'Dummy_84_trim.rec_final_vesicle_labels.mrc'
+    # result_path = 'Dummy_84_trim.rec_final_vesicle_labels.mrc'
+
+
+    reference_path = pl2.dir / reference_path
     reference = mrcfile.open(reference_path)
     reff = reference.data
 
@@ -54,6 +60,9 @@ for j in directories:
     reff = reff.astype(np.uint16)
     temp= np.where(reff<10)
     reff[temp]=0
+    # reff= (reff>=1).astype(np.uint16)
+    reff = skimage.measure.label(reff, connectivity=3)
+
     orig_reff= reff.copy()
     measures = skimage.measure.regionprops_table(reff, properties=('label','extent','bbox','area'))
     measures_pd = pd.DataFrame(measures)
@@ -93,7 +102,9 @@ for j in directories:
         mask[tuple(coords.T)] = True
         markers, _ = ndi.label(mask)
         labels = watershed(-distance, markers, mask=sub_old_label_mask)
-
+        # print(np.sum(labels))
+        # labels = skimage.morphology.erosion(labels,np.ones((7, 7,7 )))
+        # print(np.unique(labels))
         # measure_label, nc = skimage.measure.label(sub_old_label_mask, return_num=True)
         # , properties = ('label', 'extent', 'bbox', 'centroid')
 
@@ -104,9 +115,11 @@ for j in directories:
         connected_vesicles['bbox-2'][i] - delta_size: connected_vesicles['bbox-5'][i] + delta_size + 1] = labels
         # print(np.unique(labels))
 
+    # reff = reff * pl2.cytomask
+    # reff = (reff >= 1).astype(np.uint16)
     reff= skimage.measure.label(reff, connectivity=3)
     reff = reff.astype(np.uint16)
-
+    print("LEN: ",len(np.unique(reff)))
     measures_x = skimage.measure.regionprops_table(reff, properties=('label','extent','bbox','area'))
     measures_pd_x = pd.DataFrame(measures_x)
     connected_vesicles_x = measures_pd_x[(measures_pd_x['extent'] < 0.44 )]
@@ -114,5 +127,5 @@ for j in directories:
     if((connected_vesicles_x.shape[0])==0):
         print("Solved!")
         # visualization.viz_labels(pl2.image, [reff, orig_reff], ['repaired', 'manual'])
-        prepyto.save_label_to_mrc(reff, j+result_path,template_path=pl2.image_path)
+        prepyto.save_label_to_mrc(reff, pl2.dir/result_path,template_path=pl2.image_path)
     # prepyto.save_label_to_mrc(reff, j + result_path, template_path=pl2.image_path)

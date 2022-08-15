@@ -450,11 +450,15 @@ def objectwise_evalution3(reff, prediction,  img, vx ,delta_size=1):
     reff = reff.copy()
     print(len(np.unique(reff)))
 
+
     prediction = prediction.copy()
     reff_regions = skimage.measure.regionprops_table(reff, properties=('centroid', 'label', 'bbox'))
     # print((reff_regions))
     good = np.zeros(np.array(prediction).shape).astype(np.int16)
     predict_regions = skimage.measure.regionprops_table(prediction, properties=('centroid', 'label', 'bbox'))
+
+    print("HI",np.max(predict_regions['label']))
+
     all = []
     TP = 0
     FP = 0
@@ -568,12 +572,14 @@ def objectwise_evalution3(reff, prediction,  img, vx ,delta_size=1):
             membrane_density, keep_label, new_centroid, new_radius, thickness, radial, lumen_density, outer_density = \
                 get_sphere_parameters(img, 1, 5, vx*25, rounded_centroid)
 
-            if keep_label and np.linalg.norm(new_centroid-rounded_centroid)<old_radius and abs(old_radius-new_radius)<old_radius/2:
-                put_spherical_label_in_array(good, new_centroid, new_radius, FN+len(predict_regions['label']), inplace=True)
+            if keep_label and np.linalg.norm(new_centroid-rounded_centroid)<old_radius and abs(old_radius-new_radius)<old_radius/10:
+                put_spherical_label_in_array(good, new_centroid, new_radius, FN+np.max(predict_regions['label']), inplace=True)
             else:
-                good[qx, qy, qz] = FN + len(predict_regions['label'])
+                good[qx, qy, qz] = FN + np.max(predict_regions['label'])
                 print(keep_label,rounded_centroid,old_radius)
                 print(new_centroid, new_radius,np.linalg.norm(new_centroid-rounded_centroid))
+        else:
+            print("WTF")
 
     evaluator = evaluation_class.ConfusionMatrix(good >= 1 , reff2 >= 1)
     # print(np.unique(good))
