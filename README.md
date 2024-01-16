@@ -1,5 +1,5 @@
 # CryoVesNet
-![Pipeline](images/github_figure.png)
+
 ## Installation
 
 <pre> conda create -n cryoVesNet python=3.9</pre>
@@ -47,6 +47,7 @@ pl.make_full_label_file()
 </pre>
 
 
+
 ## Folder Structure
 <pre><font color="#268BD2"><b>.</b></font>
 ├── <font color="#859900"><b>az.mod</b></font>
@@ -77,3 +78,6 @@ pl.make_full_label_file()
     └── vesicles.mod
 
 2 directories, 24 files</pre>
+
+## Schematic Workflow
+![Pipeline](images/github_figure.png)
