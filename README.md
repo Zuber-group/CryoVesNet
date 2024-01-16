@@ -6,7 +6,7 @@
 <pre>  conda activate cryoVesNet </pre>
 <pre>  pip install -e . </pre>
 
-### Requirements
+## Requirements
 <pre>
 from setuptools import setup, find_packages
 
@@ -27,8 +27,9 @@ setup(
 
 )
 </pre>
-## Using pretrained model to segemnt cytoplasmic vesicles
-To detect vesicles in the cytoplasm of a tomogram, we need to place cell_outline.mod  file in the same directory as the tomogram. 
+## Using pre-trained model to segment cytoplasmic vesicles
+To create the cytomask, you need to place cell_outline.mod file in the same directory as the tomogram.
+You use the same script to build your pipeline, in case you are interested in all vesicles in tomogrmas you can set  in all vesicles within_segmentation_region = False.
 
 <pre>
 dataset_directory = "/mnt/data/amin/ctrl/"
