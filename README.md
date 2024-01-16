@@ -1,9 +1,8 @@
 # CryoVesNet
 
-CryoVesNet is a deep learning-based method for automatic segmentation of synaptic vesicles in cryo-electron tomography (cryoET) data. It is based on a U-Net architecture trained on manually segmented tomograms and postprocessing steps. CryoVesNet is uniquely insensitive to the missing wedge and can segment complete vesicles even if the membrane is not fully visible in the tomogram. The results obtained from our method, as evidenced by the Dice coefficient and other evaluation metrics, demonstrate its robustness and accuracy. Notably, our method's ability to generalize across different datasets, namely from rat synaptosomes and to primary neuronal cultures, underscores its versatility and potential for widespread application. It is not restricted to synaptic vesicles but can be applied to any spherical membrane-bound organelle. CryoVesNet is available as a Python package at this github repository.
-You can also use this approch to segment any spherical vesicle or other organelles in any cell type.
-You can use pretrain network or train your own network based on interested dataset.
-You can use provided jupyter notebook to prepare your train dataset and train your network.
+CryoVesNet is a deep learning-based method for automatic segmentation of synaptic vesicles in cryo-electron tomography (cryoET) data. It is based on a U-Net architecture trained on manually segmented tomograms and postprocessing steps. Notably, our method's ability to generalize across different datasets, namely from rat synaptosomes and to primary neuronal cultures, underscores its versatility and potential for widespread application. It is not restricted to synaptic vesicles but also can be applied to any spherical membrane-bound organelle. CryoVesNet is available as a Python package at this github repository.
+You are also able to use this approch to segment any spherical vesicle or other organelles in any cell type.
+Either, you can use pretrain network or train your own network based on interested dataset or use provided jupyter notebook to prepare your train dataset and train your network.
 This package is developed and implemented in Prof. Dr. Benoit Zuber's lab at the University of Bern, Switzerland.
 
 ## Installation
@@ -18,11 +17,11 @@ You can install the package using conda and pip. After cloning the repository, y
 
 
 ## Requirements
-> **Warning**
-> [Click here for an important warning message](./warning-message.html)
-> 
 
-
+> **Attention:**
+This program is presently in a developmental phase. Upcoming updates might introduce new functionalities, and significant modifications could occur across the existing and forthcoming versions, leading up to the stable version.
+We were using Linux build based ARM64 processors and to avoid using third party build and any confilct we used tensorflow<2.10 and numpy<1.24 to avoid any conflict. We are working on the new version of the project which will be compatible with all the latest version of the libraries.
+[Click here for warning message](./warning-message.html)
 
 <pre>
 from setuptools import setup, find_packages
@@ -49,7 +48,7 @@ To create the cytomask, you need to place cell_outline.mod file in the same dire
 You use the same script to build your pipeline, in case you are interested in all vesicles in tomogrmas you can set  in all vesicles within_segmentation_region = False.
 
 <pre>
-dataset_directory = "/mnt/data/amin/ctrl/"
+dataset_directory = "/mnt/data/tomogram_133/"
 pl = prepyto.Pipeline(directory)
 pl.network_size = 64
 pl.setup_prepyto_dir()
@@ -72,7 +71,7 @@ After running the pipeline, "deep" folder and "prepyto" folder will be created.
 The "deep" folder contains the output of the deep learning network and the "prepyto" folder contains the output of the post-processing steps.
 
 
-<pre><font color="#268BD2"><b>.</b></font>
+<pre><font color="#268BD2"><b>tomogram_133</b></font>
 ├── <font color="#859900"><b>az.mod</b></font>
 ├── <font color="#859900"><b>cell_outline.mod *</b></font>
 ├── <font color="#268BD2"><b>deep</b></font>
