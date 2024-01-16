@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='prepyto',
-    version='0.1.1',
+    version='0.1.2',
     url='',
     packages=find_packages(),
     license='',
