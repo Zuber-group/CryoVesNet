@@ -8,11 +8,22 @@ This package is developed and implemented in Prof. Dr. Benoit Zuber's lab at the
 
 ## Installation
 
+You can install the package using conda and pip. After cloning the repository, you can install the package using the following commands:
+
 <pre> conda create -n cryoVesNet python=3.9</pre>
 <pre>  conda activate cryoVesNet </pre>
 <pre>  pip install -e . </pre>
 
+
+
+
 ## Requirements
+> **Warning**
+> [Click here for an important warning message](./warning-message.html)
+> 
+
+
+
 <pre>
 from setuptools import setup, find_packages
 
@@ -22,7 +33,7 @@ setup(
     url='',
     packages=find_packages(),
     license='',
-    author='Amin Khosrozadeh',
+    author='Amin Khosrozadeh ',
     author_email='',
     description='prepyto - branch pathlib',
     package_data={'': ['weights/weights.h5']},
@@ -53,18 +64,24 @@ pl.make_full_label_file()
 </pre>
 
 
-
 ## Folder Structure
+
+The ** indicates the files that are needed for the pipeline to run.
+The single * indicates the files that are necessary for removing the outer membrane vesicles and creating the mod files.
+After running the pipeline, "deep" folder and "prepyto" folder will be created.
+The "deep" folder contains the output of the deep learning network and the "prepyto" folder contains the output of the post-processing steps.
+
+
 <pre><font color="#268BD2"><b>.</b></font>
 ├── <font color="#859900"><b>az.mod</b></font>
-├── <font color="#859900"><b>cell_outline.mod</b></font>
+├── <font color="#859900"><b>cell_outline.mod *</b></font>
 ├── <font color="#268BD2"><b>deep</b></font>
 │   ├── <font color="#D33682"><b>Dummy_133_trim.rec_processed.tiff</b></font>
 │   ├── Dummy_133_trim.rec_segUnet.npy
 │   ├── <font color="#D33682"><b>Dummy_133_trim.rec_segUnet.tiff</b></font>
 │   └── <font color="#D33682"><b>Dummy_133_trim.rec_wreal_mask.tiff</b></font>
 ├── <font color="#859900"><b>Dummy_133_trim.rec</b></font>
-├── <font color="#859900"><b>Dummy_133_trim.rec.nad *</b></font>
+├── <font color="#859900"><b>Dummy_133_trim.rec.nad **</b></font>
 ├── labels_out.mrc
 ├── <font color="#859900"><b>merge.mod</b></font>
 ├── new_labels_out.mrc
@@ -84,6 +101,14 @@ pl.make_full_label_file()
     └── vesicles.mod
 
 2 directories, 24 files</pre>
+
+## Interactive cleaning of the segmentation
+You can use the interactive cleaning of the segmentation to remove false positive and adding false negative vesicles.
+You can use the following command to run the interactive cleaning of the sepecific label file.
+
+<pre>
+pl.fix_spheres_interactively("final_vesicle_labels")
+</pre>
 
 ## Schematic Workflow
 ![Pipeline](images/github_figure.png)
