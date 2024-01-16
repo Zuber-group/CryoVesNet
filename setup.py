@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='prepyto',
-    version='0.1.2',
+    version='0.1.1',
     url='',
     packages=find_packages(),
     license='',
@@ -16,4 +16,3 @@ setup(
                       'keras','tensorflow<2.10'],
 
 )
-
