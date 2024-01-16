@@ -1,5 +1,5 @@
 # CryoVesNet
-
+![Pipeline](images/github_figure.png)
 ## Installation
 
 <pre> conda create -n cryoVesNet python=3.9</pre>
