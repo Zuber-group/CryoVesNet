@@ -509,6 +509,7 @@ def remove_labels_under_points(image_label, points_to_remove):
     return corrected_labels
 
 def expand_small_labels(deep_mask, labels, initial_threshold, min_vol,p,q,t):
+    '''Expand labels until they are q times bigger than min_vol'''
     expanded_labels = labels.copy()
     vesicle_regions = pd.DataFrame(skimage.measure.regionprops_table(labels, properties=('label', 'area', 'centroid')))
     small_labels = vesicle_regions[vesicle_regions.area < p*min_vol].set_index('label')
