@@ -705,7 +705,7 @@ class Pipeline():
             offset = self.full_labels.max()
             handpicked_indices = handpicked_array.nonzero()
             self.full_labels[handpicked_indices] = handpicked_array[handpicked_indices] + offset
-        prepyto.save_label_to_mrc(self.full_labels, self.full_labels_path, template_path=self.image_path, origin_adjustment=q)
+        prepyto.save_label_to_mrc(self.full_labels, self.full_labels_path, template_path=self.image_path, q=origin_adjustment)
         if memkill:
             self.clear_memory()
         print(f"saved labels to {self.full_labels_path.relative_to(self.dir)}")
