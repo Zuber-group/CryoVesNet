@@ -26,10 +26,12 @@ def get_voxel_size_in_nm(path_to_file):
     return voxel_size
 
 def min_radius_of_vesicle(voxel_size, radius_thr=12):
+    ''' Here we assume that the minimum radius of vesicle is 12 nm '''
     radius = radius_thr / voxel_size
     return radius
 
 def min_volume_of_vesicle(voxel_size, radius_thr = 12):
+    "Calculate the minimum volume of vesicle in voxels"
     radius = min_radius_of_vesicle(voxel_size, radius_thr)
     volume_of_vesicle = (4.0 / 3.0) * np.pi * (radius) ** 3
     return volume_of_vesicle
@@ -142,6 +144,7 @@ def find_threshold_per_vesicle_intensity(int_image, image_label, mask_image, dil
 
 
 def pacman_killer(image_label):
+    "This function is used to make vesicles convex"
     vesicle_regions = skimage.measure.regionprops_table(image_label, properties=('label', 'bbox'))
     bboxes = get_bboxes_from_regions(vesicle_regions)
     labels = get_labels_from_regions(vesicle_regions)
@@ -166,6 +169,7 @@ def pacman_killer(image_label):
     return corrected_labels
 
 def fast_pacman_killer(image_label):
+    "In some cases the convex_hull_image function fails, which in pacman killer we used try and catch but normally this whould be faster"
     vesicle_regions = skimage.measure.regionprops_table(image_label, properties=('label', 'bbox'))
     bboxes = get_bboxes_from_regions(vesicle_regions)
     labels = get_labels_from_regions(vesicle_regions)
@@ -232,6 +236,7 @@ def adjust_shell_intensity(image_int, image_labels):
     return best_param, best_mask  # , mean_shell
 
 def objectwise_evalution(reff, prediction, delta_size=1, proportion=0.0):
+    # You don not need this function , this is just for evaluation
     reff = reff.copy()
     prediction = prediction.copy()
     reff_regions = skimage.measure.regionprops_table(reff, properties=('centroid', 'label', 'bbox'))
@@ -540,6 +545,9 @@ def vesicles_table(labels):
     return ves_tabel
 
 def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1):
+    '''We assume that the have low extent value and high area_zscore are colliding vesicles
+    Later on we goes back to mask and search for finer threshold to separate them'''
+
     collision_ves = ves_table[(ves_table['extent'] < 0.5) & (ves_table['area_zscore'] > 1)]
     print(collision_ves)
     old_mask = deep_mask.copy()
