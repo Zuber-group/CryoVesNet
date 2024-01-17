@@ -8,9 +8,13 @@ This package is developed and implemented in Prof. Dr. Benoit Zuber's lab at the
 ## Installation
 
 You can install the package using conda and pip. After cloning the repository, you can install the package using the following commands:
-
+1. Clone the repository
+<pre> git clone https://github.com/Zuber-group/CryoVesNet/</pre>
+2. Create a conda environment
 <pre> conda create -n cryoVesNet python=3.9</pre>
+3. Activate the conda environment
 <pre>  conda activate cryoVesNet </pre>
+4. Install the pre-requirmenets
 <pre>  pip install -e . </pre>
 
 

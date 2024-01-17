@@ -634,7 +634,7 @@ class Pipeline():
         with pkg_resources.path(pyto_scripts, '.') as src:
             shutil.copytree(src, self.pyto_dir)
 
-    def make_full_modfile(self, input_array_name='last_output_array_name', do_rearrange_labels=True, memkill=True, q=1):
+    def make_full_modfile(self, input_array_name='last_output_array_name', do_rearrange_labels=True, memkill=True, origin_adjustment=1):
         """
         convert the vesicle label file to a modfile and merge it with the initial modfile
         do_rearrange_labels: if True, then no empty label in the input labels array are left
@@ -649,7 +649,7 @@ class Pipeline():
         else:
             self.final_vesicle_labels = getattr(self, input_array_name)
         prepyto.save_label_to_mrc(self.final_vesicle_labels, self.final_vesicle_labels_path,
-                                  template_path=self.image_path, q=q)
+                                  template_path=self.image_path, q=origin_adjustment)
         self.last_output_array_name = 'final_vesicle_labels'
         self.print_output_info()
         cmd0 = f"imodauto -f 3 -m 4 -h 0 -O 10 \"{self.final_vesicle_labels_path}\" \"{self.vesicle_mod_path}\""
@@ -672,7 +672,7 @@ class Pipeline():
                              additional_non_vesicle_object_modpath=None,
                              handpicked_vesicles_objects=[],
                              hand_picked_vesicles_modpath=None,
-                             first_vesicle_index=10, memkill=True, q=1):
+                             first_vesicle_index=10, memkill=True, origin_adjustment=1):
         """
         Assemble full label file from masks and full mod file
         :return:
@@ -705,7 +705,7 @@ class Pipeline():
             offset = self.full_labels.max()
             handpicked_indices = handpicked_array.nonzero()
             self.full_labels[handpicked_indices] = handpicked_array[handpicked_indices] + offset
-        prepyto.save_label_to_mrc(self.full_labels, self.full_labels_path, template_path=self.image_path, q=q)
+        prepyto.save_label_to_mrc(self.full_labels, self.full_labels_path, template_path=self.image_path, origin_adjustment=q)
         if memkill:
             self.clear_memory()
         print(f"saved labels to {self.full_labels_path.relative_to(self.dir)}")
