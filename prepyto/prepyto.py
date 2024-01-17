@@ -1018,18 +1018,18 @@ def run_default_pipeline(dataset_dir):
     myPipeline = pipeline.Pipeline(dataset_dir)
     myPipeline.setup_prepyto_dir()
     # myPipeline.evaluation()
-    pl2.network_size = 64
+    myPipeline.network_size = 64
     myPipeline.run_deep()
     myPipeline.zoom()
     myPipeline.label_vesicles()
-    myPipeline.label_vesicles_simply(within_segmentation_region = True, input_array_name="deep_mask")
+    myPipeline.label_vesicles_simply()
     # myPipeline.threshold_tuner()
     # myPipeline.label_convexer()
     myPipeline.make_spheres()
     myPipeline.repair_spheres()
     myPipeline.make_full_modfile()
     myPipeline.make_full_label_file()
-    myPipeline.network_size = 64
+
     # myPipeline.remove_small_labels()
     # myPipeline.make_full_modfile()
     # myPipeline.make_full_label_file()
