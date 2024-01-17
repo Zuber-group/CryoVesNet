@@ -50,21 +50,32 @@ setup(
 ## Using the pre-trained model to segment cytoplasmic vesicles
 To create the cytomask, you need to place cell_outline.mod file in the same directory as the tomogram.
 You use the same script to build your pipeline, in case you are interested in all vesicles in tomogrmas you can set  in all vesicles within_segmentation_region = False.
+We used object oreindted approach to build the pipeline. You can use the following [script](notebooks/single_dataset.py) to build your pipeline and run different steps of the pipeline.
 
-<pre>
-dataset_directory = "/mnt/data/tomogram_133/"
-pl = prepyto.Pipeline(directory)
-pl.network_size = 64
-pl.setup_prepyto_dir()
-pl.run_deep(force_run=True, rescale=1.0)
-pl.zoom(force_run=True, )
-pl.label_vesicles(within_segmentation_region = True)
-pl.label_vesicles_simply(within_segmentation_region = True, input_array_name="deep_mask")
-pl.make_spheres()
-pl.repair_spheres()
-pl.make_full_modfile(input_array_name='convex_labels')
-pl.make_full_label_file()
-</pre>
+
+1. Set the directory of the tomogram 
+<pre>dataset_directory = "/mnt/data/tomogram_133/"</pre>
+2. Creating the pipeline  
+<pre> pl = prepyto.Pipeline(directory) </pre>
+3. Set the network size (you can check other methods of the pipeline like check_files or prepare_deep) 
+<pre> pl.network_size = 64 #the larger the better to avoid tiling effects </pre>
+4. Setup the new directory  
+<pre> pl.setup_prepyto_dir() </pre>
+5. Run the deep learning network
+<pre> pl.run_deep(force_run=True, rescale=1.0) </pre>
+6. Zoom the mask to the original size of the tomogram
+<pre> pl.zoom(force_run=True,) </pre>
+7. Generate primary labels if you don not have cell_outline.mod file in the same directory as the tomogram you can set within_segmentation_region = False
+<pre> pl.label_vesicles(within_segmentation_region = True) </pre>
+8. Generate secondary labels
+<pre> pl.label_vesicles_simply(within_segmentation_region = True, input_array_name="deep_mask") </pre>
+9. Refinement using radial profile
+<pre> pl.make_spheres() </pre>
+10. Outlier detection and refinement
+<pre> pl.repair_spheres() </pre>
+11. This step ensures that the mod file is compatible with the pyto software
+<pre> pl.make_full_modfile(input_array_name='convex_labels')
+ pl.make_full_label_file() </pre>
 
 
 ## Folder Structure

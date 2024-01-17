@@ -1,12 +1,11 @@
-import warnings
+# This script runs the pipeline on single tomograms
+
 import os
-warnings.filterwarnings("ignore")
 os.environ["TF_CPP_MIN_LOG_LEVEL"]="2"
+# Here you can choose which GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 import prepyto
-
-
 
 dataset_directory = "/mnt/data/amin/Handpicked/133/"
 
