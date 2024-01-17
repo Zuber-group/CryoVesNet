@@ -6,7 +6,9 @@ Either, you can use pretrain network or train your own network based on interest
 This package is developed and implemented in Prof. Dr. Benoit Zuber's lab at the University of Bern, Switzerland.
 
 ## Installation
-
+> **Attention:**
+This program is presently in a developmental phase. Upcoming updates might introduce new functionalities, and significant modifications could occur across the existing and forthcoming versions, leading up to the stable version.
+> 
 You can install the package using conda and pip. After cloning the repository, you can install the package using the following commands:
 1. Clone the repository
 <pre> git clone https://github.com/Zuber-group/CryoVesNet/</pre>
@@ -22,10 +24,9 @@ You can install the package using conda and pip. After cloning the repository, y
 
 ## Requirements
 
-> **Attention:**
-This program is presently in a developmental phase. Upcoming updates might introduce new functionalities, and significant modifications could occur across the existing and forthcoming versions, leading up to the stable version.
-We were using Linux build based ARM64 processors and to avoid using third party build and any confilct we used tensorflow<2.10 and numpy<1.24 to avoid any conflict. We are working on the new version of the project which will be compatible with all the latest version of the libraries.
 [Click here for warning message](./warning-message.html)
+> > **Warning:**
+We were using Linux build based ARM64 processors and to avoid using third party build and any confilct we used tensorflow<2.10 and numpy<1.24 to avoid any conflict. We are working on the new version of the project which will be compatible with all the latest version of the libraries.
 
 <pre>
 from setuptools import setup, find_packages
