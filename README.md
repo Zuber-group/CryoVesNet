@@ -43,7 +43,7 @@ setup(
 
 )
 </pre>
-## Using pre-trained model to segment cytoplasmic vesicles
+## Using the pre-trained model to segment cytoplasmic vesicles
 To create the cytomask, you need to place cell_outline.mod file in the same directory as the tomogram.
 You use the same script to build your pipeline, in case you are interested in all vesicles in tomogrmas you can set  in all vesicles within_segmentation_region = False.
 
@@ -109,5 +109,7 @@ You can use the following command to run the interactive cleaning of the sepecif
 pl.fix_spheres_interactively("final_vesicle_labels")
 </pre>
 
+## Train and create your own dataset
+The notebooks allow to [generate the training data](notebooks/create_trainingset.ipynb) and [train the network](notebooks/training_vesicles.ipynb). Pre-trained weights for the network are provided in the weights folder.
 ## Schematic Workflow
 ![Pipeline](images/github_figure.png)
