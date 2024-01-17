@@ -3,7 +3,7 @@
 CryoVesNet is a deep learning-based method for automatic segmentation of synaptic vesicles in cryo-electron tomography (cryoET) data. It is based on a U-Net architecture trained on manually segmented tomograms and postprocessing steps. Notably, our method's ability to generalize across different datasets, namely from rat synaptosomes and to primary neuronal cultures, underscores its versatility and potential for widespread application. It is not restricted to synaptic vesicles but also can be applied to any spherical membrane-bound organelle. CryoVesNet is available as a Python package at this github repository.
 You are also able to use this approch to segment any spherical vesicle or other organelles in any cell type.
 Either, you can use pretrain network or train your own network based on interested dataset or use provided jupyter notebook to prepare your train dataset and train your network.
-This package is developed and implemented in Prof. Dr. Benoit Zuber's lab at the University of Bern, Switzerland.
+This package is developed and implemented @Zuber-group in Prof. Dr. Benoit Zuber's lab at the University of Bern, Switzerland.
 
 ## Installation
 > **Attention:**
