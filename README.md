@@ -25,7 +25,7 @@ You can install the package using conda and pip. After cloning the repository, y
 ## Requirements
 
 [Click here for warning message](./warning-message.html)
-> > **Warning:**
+> **Warning:**
 We were using Linux build based ARM64 processors and to avoid using third party build and any confilct we used tensorflow<2.10 and numpy<1.24 to avoid any conflict. We are working on the new version of the project which will be compatible with all the latest version of the libraries.
 
 <pre>
