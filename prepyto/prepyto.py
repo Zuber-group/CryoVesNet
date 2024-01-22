@@ -1013,16 +1013,16 @@ def rearrange_labels(image_label, dtype=np.int16):
     return lookup_table[image_label]
 
 
-def run_default_pipeline(dataset_dir):
+def run_default_pipeline(dataset_dir,force=False,scale_proportion=1.0,within_cytoplasm=False):
     dataset_dir = Path(dataset_dir)
     myPipeline = pipeline.Pipeline(dataset_dir)
     myPipeline.setup_prepyto_dir()
     # myPipeline.evaluation()
-    myPipeline.network_size = 64
-    myPipeline.run_deep()
-    myPipeline.zoom()
-    myPipeline.label_vesicles()
-    myPipeline.label_vesicles_simply()
+    myPipeline.network_size = 128
+    myPipeline.run_deep(force_run=force,rescale=scale_proportion)
+    myPipeline.zoom(force_run=force)
+    myPipeline.label_vesicles(within_segmentation_region =within_cytoplasm)
+    # myPipeline.label_vesicles_simply(within_segmentation_region =within_cytoplasm)
     # myPipeline.threshold_tuner()
     # myPipeline.label_convexer()
     myPipeline.make_spheres()

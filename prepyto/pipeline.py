@@ -50,6 +50,8 @@ class Pipeline():
         self.save_dir = self.dir / 'prepyto'
         self.pyto_dir = self.dir / 'pyto'
         pattern = '*.rec.nad'
+        # pattern = '*.rec'
+        print(pattern)
         try:
             self.image_path = next(self.dir.glob(pattern))  # was earlier called path_to_file
         except StopIteration:

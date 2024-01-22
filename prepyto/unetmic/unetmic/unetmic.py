@@ -3,11 +3,12 @@ import numpy as np
 from tqdm import tqdm
 import skimage.io
 import mrcfile
+import tensorflow as tf
 
 try:
     from tensorflow.keras import backend as K
     from tensorflow.keras.models import Model
-    from tensorflow.keras.callbacks import ModelCheckpoint
+    from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping
     from tensorflow.keras.layers import Input, Conv3D
 except ModuleNotFoundError:
     print("unetmic: tensorflow is missing, some function will fail")
@@ -67,6 +68,20 @@ def dice_coef(y_true, y_pred):
     intersection = K.sum(y_true_f * y_pred_f)
     return (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
 
+def weighted_binary_crossentropy(y_true, y_pred):
+    # Assign weights
+    class_weight_0 = 1.0
+    class_weight_1 = 10.0
+
+    # Calculate the binary cross-entropy loss
+    bce = K.binary_crossentropy(y_true, y_pred)
+
+    # Apply the weights
+    weight_vector = y_true * class_weight_1 + (1. - y_true) * class_weight_0
+    weighted_bce = weight_vector * bce
+
+    # Return the mean error
+    return K.mean(weighted_bce)
 
 def create_unet_3d(inputsize=(32, 32, 32, 1),
                    n_depth=2,
@@ -90,20 +105,74 @@ def create_unet_3d(inputsize=(32, 32, 32, 1),
 
     unet3d = Model(inputs=input, outputs=final)
     unet3d.compile(optimizer='adam', loss='binary_crossentropy', metrics=[dice_coef])
+    # For multi-gpu training you need to use the following line instead of the previous one
+    # unet3d.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=[dice_coef])
 
     return unet3d
 
 
 def run_training(network, save_folder, folder, numtot, batchsize, numvalid):
     model_checkpoint = ModelCheckpoint(save_folder + 'weights.h5', monitor='val_loss', save_best_only=True)
+
+    # model_checkpoint = ModelCheckpoint(save_folder + 'weights.h5', monitor='val_dice_coef', mode='max',save_best_only=True)
+    # earlystopping = EarlyStopping(
+    #     monitor="val_dice_coef",
+    #     min_delta=0,
+    #     patience=10,
+    #     verbose=1,
+    #     mode="max",
+    #     baseline=None,
+    #     restore_best_weights=True,
+    # )
     # logdir = os.path.join("logs", datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
     # tensorboard_callback = tf.keras.callbacks.TensorBoard(logdir, histogram_freq=1)
 
+    # network.fit_generator(generator=train_generator(folder, numtot, batchsize),
+    #                       validation_data=valid_generator(folder, numvalid, numtot, batchsize),
+    #                       validation_steps=np.floor(numvalid / batchsize),
+    #                       steps_per_epoch=np.floor(numtot / batchsize),
+    #                       epochs=200, verbose=1, callbacks=[model_checkpoint,earlystopping], class_weight=[1, 10])
     network.fit_generator(generator=train_generator(folder, numtot, batchsize),
                           validation_data=valid_generator(folder, numvalid, numtot, batchsize),
                           validation_steps=np.floor(numvalid / batchsize),
                           steps_per_epoch=np.floor(numtot / batchsize),
-                          epochs=200, verbose=1, callbacks=[model_checkpoint], class_weight=[1, 10])
+                          epochs=200, verbose=1, callbacks=[model_checkpoint])
+
+def run_training_multiGPU(save_folder, folder, numtot, batchsize, numvalid):
+    # Create a MirroredStrategy.
+    strategy = tf.distribute.MirroredStrategy()
+    print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
+
+    with strategy.scope():
+        # Create and compile the model within the strategy scope
+        network = create_unet_3d(inputsize=(32, 32, 32, 1),
+                                 n_depth=2,
+                                 n_filter_base=16,
+                                 kernel_size=(3, 3, 3),
+                                 activation='relu',
+                                 batch_norm=True,
+                                 dropout=0.0,
+                                 n_conv_per_depth=2,
+                                 pool_size=(2, 2, 2),
+                                 n_channel_out=1)
+        network.compile(optimizer='adam', loss=weighted_binary_crossentropy, metrics=[dice_coef])
+
+        # Setup callbacks
+        model_checkpoint = ModelCheckpoint(save_folder + 'weights.h5', monitor='val_dice_coef', mode='max', save_best_only=True)
+        earlystopping = EarlyStopping(monitor="val_dice_coef", min_delta=0, patience=100, verbose=1, mode="max", restore_best_weights=True)
+
+        # Convert generators to tf.data.Dataset
+        train_data = tf.data.Dataset.from_generator(lambda: train_generator(folder, numtot, batchsize),
+                                                    output_types=(tf.float32, tf.float32),
+                                                    output_shapes=([batchsize, 32, 32, 32, 1], [batchsize, 32, 32, 32, 1]))
+        valid_data = tf.data.Dataset.from_generator(lambda: valid_generator(folder, numvalid, numtot, batchsize),
+                                                    output_types=(tf.float32, tf.float32),
+                                                    output_shapes=([batchsize, 32, 32, 32, 1], [batchsize, 32, 32, 32, 1]))
+
+        # Train the model
+        network.fit(train_data, epochs=200, steps_per_epoch=np.floor(numtot / batchsize),
+                    validation_data=valid_data, validation_steps=np.floor(numvalid / batchsize),
+                    callbacks=[model_checkpoint, earlystopping])
 
 
 def run_segmentation(image, unet3d):
