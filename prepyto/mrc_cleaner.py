@@ -1,3 +1,5 @@
+# this set of functions primarily developed as utilities for the prepyto package
+
 import numpy as np
 import napari
 import mrcfile
@@ -69,6 +71,8 @@ def mrc_header_cleaner(source_mrc_path,template_mrc_path, target_mrc_path):
     return
 
 
+## this function asks the user to choose a file from a list of files in a directory
+## and able to easier select the file for directories with non defualt names
 
 def ask_file_path(mypath,file_extension=('.mrc', '.nad', '.rec')):
     dataset_lst = [e for e in mypath.iterdir()]
