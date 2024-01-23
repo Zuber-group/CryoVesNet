@@ -23,6 +23,7 @@ def add_points_remove_labels(pipe, labels_to_analyze, additional_labels=None ):
         viewer.add_labels(labels_to_analyze)
 
         @viewer.bind_key('s')
+        # Press 's' to save the labels
         def print_message(viewer):
             print('Save procedures')
             yield
