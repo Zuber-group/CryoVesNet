@@ -3,6 +3,7 @@ from pathlib import Path
 import tensorflow as tf
 import shutil
 
+# old function for segmentation before pathlib and using os.chdir
 def vesicle_segmentation(path_to_folder):
     os.chdir('../../..')
     dataset_dir = os.getcwd()

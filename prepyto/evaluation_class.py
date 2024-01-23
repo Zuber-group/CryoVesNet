@@ -1,5 +1,7 @@
 import numpy as np
 
+# Some utility functions for evaluation
+
 
 class ConfusionMatrix:
     def __init__(self, prediction, reference):
@@ -34,6 +36,7 @@ class ConfusionMatrix:
                (self.tp + self.fp + self.fn)
 
     def former_dice(self):
+        # Soft DICE
         if np.any(self.prediction > 1):
             prediction = self.prediction >= 1
         else:
