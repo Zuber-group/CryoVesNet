@@ -1,2 +1,0 @@
-import prepyto
-prepyto.main()
