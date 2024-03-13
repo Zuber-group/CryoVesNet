@@ -33,8 +33,8 @@ def add_points_remove_labels(pipe, labels_to_analyze, additional_labels=None ):
                                                                          points_to_add_layer.size[:,1], minimum_box_size)
         if additional_labels is not None:
             viewer.add_labels(additional_labels)
-        points_to_remove_layer = viewer.add_points(np.empty((0,3)), n_dimensional=True, name="spheres to remove")
-        points_to_add_layer = viewer.add_points(np.empty((0,3)), size=[], opacity=0.3,
+        points_to_remove_layer = viewer.add_points(data= np.empty((0, 3)), ndim=3, n_dimensional=True, name="spheres to remove")
+        points_to_add_layer = viewer.add_points(data=np.empty((0, 3)), ndim=3, size=[], opacity=0.3,
                                                 n_dimensional=True, name="spheres to add")
     points_to_remove = points_to_remove_layer.data
     points_to_add = points_to_add_layer.data

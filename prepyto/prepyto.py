@@ -623,7 +623,7 @@ def add_sphere_labels_under_points(image, image_labels, points_to_add,
         point_size = points_to_add_sizes[i]
         radius = int(max(point_size, minimum_box_size)//2)
         label = i + max_label + 1
-        density, keep_label, new_centroid, new_radius, thickness = \
+        density, keep_label, new_centroid, new_radius, thickness, radial = \
             get_sphere_parameters(image, label, 5, radius, rounded_centroid)
         if keep_label:
             put_spherical_label_in_array(corrected_labels, new_centroid, new_radius, label, inplace = True)
