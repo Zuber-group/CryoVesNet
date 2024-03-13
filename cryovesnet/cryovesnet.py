@@ -1016,7 +1016,7 @@ def rearrange_labels(image_label, dtype=np.int16):
 def run_default_pipeline(dataset_dir,force=False,scale_proportion=1.0,within_cytoplasm=False):
     dataset_dir = Path(dataset_dir)
     myPipeline = pipeline.Pipeline(dataset_dir)
-    myPipeline.setup_prepyto_dir()
+    myPipeline.setup_cryovesnet_dir()
     # myPipeline.evaluation()
     myPipeline.network_size = 128
     myPipeline.run_deep(force_run=force,rescale=scale_proportion)

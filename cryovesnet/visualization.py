@@ -1,7 +1,7 @@
 
 import napari
 import numpy as np
-import prepyto
+import cryovesnet
 
 
 def viz_labels(image,list_of_labels,list_of_names):
@@ -28,8 +28,8 @@ def add_points_remove_labels(pipe, labels_to_analyze, additional_labels=None ):
             print('Save procedures')
             yield
             minimum_box_size = pipe.voxel_size * 50
-            pipe.mancorr_labels = prepyto.remove_labels_under_points(labels_to_analyze, points_to_remove_layer.data)
-            pipe.mancorr_labels = prepyto.add_sphere_labels_under_points(pipe.image, pipe.mancorr_labels, points_to_add_layer.data,
+            pipe.mancorr_labels = cryovesnet.remove_labels_under_points(labels_to_analyze, points_to_remove_layer.data)
+            pipe.mancorr_labels = cryovesnet.add_sphere_labels_under_points(pipe.image, pipe.mancorr_labels, points_to_add_layer.data,
                                                                          points_to_add_layer.size[:,1], minimum_box_size)
         if additional_labels is not None:
             viewer.add_labels(additional_labels)

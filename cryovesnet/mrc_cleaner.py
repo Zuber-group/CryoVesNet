@@ -1,4 +1,4 @@
-# this set of functions primarily developed as utilities for the prepyto package
+# this set of functions primarily developed as utilities for the cryovesnet package
 
 import numpy as np
 import napari

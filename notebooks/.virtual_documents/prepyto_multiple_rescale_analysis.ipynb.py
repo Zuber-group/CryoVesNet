@@ -1,4 +1,4 @@
-import prepyto
+import cryovesnet
 import numpy as np
 import napari
 import tqdm
@@ -6,7 +6,7 @@ import skimage
 import matplotlib.pyplot as plt
 
 
-pl = prepyto.Pipeline("/Users/bzuber/Microscopic Anatomy Dropbox/Benoit Zuber/projects/deepvesicle/data/102_4e_trimmed")
+pl = cryovesnet.Pipeline("/Users/bzuber/Microscopic Anatomy Dropbox/Benoit Zuber/projects/deepvesicle/data/102_4e_trimmed")
 
 
 pl.set_array('deep_labels')

@@ -7,7 +7,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"]="2"
 # Here you can choose which GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
-import prepyto
+import cryovesnet
 
 # Set up the directory where the folders are like this:
 # Handpicked
@@ -29,9 +29,9 @@ dataset_directory = "/mnt/data/amin/Handpicked/"
 
 
 def single_dataset_handler(directory):
-    pl = prepyto.Pipeline(directory)
+    pl = cryovesnet.Pipeline(directory)
     pl.network_size = 64
-    pl.setup_prepyto_dir()
+    pl.setup_cryovesnet_dir()
     pl.run_deep(force_run=True, rescale=0.5)
     pl.zoom(force_run=True, )
     pl.label_vesicles(within_segmentation_region = True)

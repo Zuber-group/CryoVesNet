@@ -5,14 +5,14 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"]="2"
 # Here you can choose which GPU to use
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
-import prepyto
+import cryovesnet
 
 dataset_directory = "/mnt/data/amin/Handpicked/133/"
 
 
-pl2 = prepyto.Pipeline(dataset_directory)
+pl2 = cryovesnet.Pipeline(dataset_directory)
 pl2.network_size=64
-pl2.setup_prepyto_dir()
+pl2.setup_cryovesnet_dir()
 pl2.run_deep(force_run=True, rescale=0.5)
 pl2.zoom(force_run=True,)
 pl2.label_vesicles(within_segmentation_region=True)

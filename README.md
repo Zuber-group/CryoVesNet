@@ -38,7 +38,7 @@ dataset_directory = "/mnt/data/tomogram_133/"
 </pre>
 2. Creating the pipeline  
 <pre>
-pl = prepyto.Pipeline(directory)
+pl = cryovesnet.Pipeline(directory)
 </pre>
 3. Set the network size (you can check other methods of the pipeline like check_files or prepare_deep) 
 <pre>
@@ -46,7 +46,7 @@ pl.network_size = 64 #the larger the better to avoid tiling effects
 </pre>
 4. Setup the new directory  
 <pre>
-pl.setup_prepyto_dir()
+pl.setup_cryovesnet_dir()
 </pre>
 5. Run the deep learning network
 <pre>
@@ -80,16 +80,16 @@ pl.make_full_label_file()
 ## Simple usage example
 In the most simple case, you can use the following script to run the pipeline.
 <pre>
-import prepyto
-prepyto.run_default_pipeline('/mnt/data/amin/testtest/2')
+import cryovesnet
+cryovesnet.run_default_pipeline('/mnt/data/amin/testtest/2')
 </pre>
 
 ## Folder Structure
 
 The ** indicates the files that are needed for the pipeline to run.
 The single * indicates the files that are necessary for removing the outer membrane vesicles and creating the mod files.
-After running the pipeline, "deep" folder and "prepyto" folder will be created.
-The "deep" folder contains the output of the deep learning network and the "prepyto" folder contains the output of the post-processing steps.
+After running the pipeline, "deep" folder and "cryovesnet" folder will be created.
+The "deep" folder contains the output of the deep learning network and the "cryovesnet" folder contains the output of the post-processing steps.
 
 
 <pre><font color="#268BD2"><b>tomogram_133</b></font>
@@ -105,7 +105,7 @@ The "deep" folder contains the output of the deep learning network and the "prep
 ├── labels_out.mrc
 ├── <font color="#859900"><b>merge.mod</b></font>
 ├── new_labels_out.mrc
-└── <font color="#268BD2"><b>prepyto</b></font>
+└── <font color="#268BD2"><b>cryovesnet</b></font>
     ├── Dummy_133_trim.rec_azmask.mrc
     ├── Dummy_133_trim.rec_clean_deep_labels.mrc
     ├── Dummy_133_trim.rec_convex_labels.mrc
@@ -116,7 +116,7 @@ The "deep" folder contains the output of the deep learning network and the "prep
     ├── Dummy_133_trim.rec_sphere_dataframe.pkl
     ├── Dummy_133_trim.rec_sphere.mrc
     ├── Dummy_133_trim.rec_zoomed_mask.mrc
-    ├── full_prepyto.mod
+    ├── full_cryovesnet.mod
     ├── labels.mrc
     └── vesicles.mod
 
