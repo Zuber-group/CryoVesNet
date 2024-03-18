@@ -140,9 +140,11 @@ This repository includes scripts or code from external packages. To ensure integ
 ## Citation
 
 If you utilize our software in your research, please acknowledge its use by citing this work. Our software may integrate or rely on various third-party tools; hence, we recommend citing those as appropriately detailed in their documentation.
+https://doi.org/10.1101/2024.02.26.582080
 
 <details><summary>Bibtex</summary><p>
-    
+
+```
 @article {Khosrozadeh2024.02.26.582080,
 	author = {Amin Khosrozadeh and Raphaela Seeger and Guillaume Witz and Julika Radecke and Jakob B. S{\o}rensen and Beno{\^\i}t Zuber},
 	title = {CryoVesNet: A Dedicated Framework for Synaptic Vesicle Segmentation in Cryo Electron Tomograms},
@@ -154,7 +156,7 @@ If you utilize our software in your research, please acknowledge its use by citi
 	journal = {bioRxiv}
 }
 </p></details>
-
+```
 
 
 
