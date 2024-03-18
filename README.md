@@ -132,5 +132,10 @@ pl.fix_spheres_interactively("final_vesicle_labels")
 
 ## Train and create your own dataset
 The notebooks allow to [generate the training data](notebooks/create_trainingset.ipynb) and [train the network](notebooks/training_vesicles.ipynb). Pre-trained weights for the network are provided in the weights folder.
+
+## Pyto
+
+This repository includes scripts or code from external packages. To ensure integration or extended capabilities, inclusions is from the [Pyto](https://github.com/vladanl/Pyto) project. In case you want to segemnt the connectors and teathers afterwards you can use this software.
+
 ## Schematic Workflow
 ![Pipeline](images/github_figure.png)
