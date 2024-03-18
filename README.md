@@ -38,7 +38,7 @@ dataset_directory = "/mnt/data/tomogram_133/"
 </pre>
 2. Creating the pipeline  
 <pre>
-pl = cryovesnet.Pipeline(directory)
+pl = cryovesnet.Pipeline(dataset_directory)
 </pre>
 3. Set the network size (you can check other methods of the pipeline like check_files or prepare_deep) 
 <pre>
