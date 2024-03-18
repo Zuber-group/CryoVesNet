@@ -13,6 +13,6 @@ setup(
     include_package_data=True,
     install_requires=['numpy<1.24', 'scikit-image<0.19', 'scipy', 'jupyter','jupyterlab',
                       'pandas', 'h5py', 'tifffile','mrcfile','tqdm', 'napari','pydantic<2',
-                      'keras','tensorflow<2.10'],
+                      'pyqt5','napari-mrcfile-reader','keras','tensorflow<2.10'],
 
 )
