@@ -1,8 +1,8 @@
 # CryoVesNet
 
 CryoVesNet is a deep learning-based method for automatic segmentation of synaptic vesicles in cryo-electron tomography (cryoET) data. It is based on a U-Net architecture trained on manually segmented tomograms and postprocessing steps. Notably, our method's ability to generalize across different datasets, namely from rat synaptosomes and to primary neuronal cultures, underscores its versatility and potential for widespread application. It is not restricted to synaptic vesicles but can also be applied to any spherical membrane-bound organelle.
-You can either use a pretrain network or use the provided jupyter notebook to prepare your train dataset and train your network.
-This package is developed and implemented [@Zuber-group](https://github.com/Zuber-group) Benoit Zuber's lab at the University of Bern, Switzerland.
+You can either use a pre-train network (pixel size: 22.40 A) or use the provided jupyter notebook to prepare your train dataset and train your network.
+This package is developed and implemented [@Zuber-group](https://github.com/Zuber-group) in Benoit Zuber's lab at the University of Bern, Switzerland.
 
 ## Installation
 > **Attention:**
@@ -15,7 +15,7 @@ You can install the package using conda and pip. After cloning the repository, y
 <pre> conda create -n cryoVesNet python=3.9</pre>
 3. Activate the conda environment
 <pre>  conda activate cryoVesNet </pre>
-4. Install the pre-requirmenets
+4. Install the pre-requirements
 <pre>  pip install -e . </pre>
 
 
@@ -23,14 +23,14 @@ You can install the package using conda and pip. After cloning the repository, y
 
 
 > **Warning:**
-We were using Linux build based ARM64 processors and to avoid using third party build and any confilct we used tensorflow<2.10 and numpy<1.24 to avoid any conflict. We are working on the new version of the project which will be compatible with all the latest version of the libraries.
+We were using Linux build-based ARM64 processors and to avoid using third-party build and any conflict we used tensorflow<2.10 and numpy<1.24 to avoid any conflict. We are working on the new version of the project which will be compatible with all the latest versions of the libraries.
 
 
 ## Using the pre-trained model to segment cytoplasmic vesicles
-To create the cytomask, you need to place cell_outline.mod file in the same directory as the tomogram.
-You use the same script to build your pipeline, in case you are interested in all vesicles in tomogrmas you can set  in all vesicles within_segmentation_region = False.
-We used object oreindted approach to build the pipeline. You can use the following [script](notebooks/single_dataset.py) to build your pipeline and run different steps of the pipeline.
-The steeps briefly explained as follows:
+To create the cytomask, you need to place the cell_outline.mod file in the same directory as the tomogram.
+You use the same script to build your pipeline, in case you are interested in all vesicles in tomograms you can set  in all vesicles within_segmentation_region = False.
+We used object object-orientated approach to build the pipeline. You can use the following [script](notebooks/single_dataset.py) to build your pipeline and run different steps of the pipeline.
+The steps are briefly explained as follows:
 
 1. Set the directory of the tomogram 
 <pre>
@@ -50,12 +50,12 @@ pl.setup_cryovesnet_dir()
 </pre>
 5. Run the deep learning network
 <pre>
-pl.run_deep(force_run=True, rescale=1.0)
+pl.run_deep(force_run=True, rescale=1.0)  
 </pre>
 6. Zoom the mask to the original size of the tomogram
 <pre>pl.zoom(force_run=True,)
 </pre>
-7. Generate primary labels if you don not have cell_outline.mod file in the same directory as the tomogram you can set within_segmentation_region = False
+7. Generate primary labels if you do not have cell_outline.mod file in the same directory as the tomogram you can set within_segmentation_region = False
 <pre>
 pl.label_vesicles(within_segmentation_region = True)
 </pre>
@@ -63,7 +63,7 @@ pl.label_vesicles(within_segmentation_region = True)
 <pre>
 pl.label_vesicles_simply(within_segmentation_region = True, input_array_name="deep_mask")
 </pre>
-9. Refinement using radial profile
+9. Refinement using the radial profile
 <pre>
 pl.make_spheres()
 </pre>
