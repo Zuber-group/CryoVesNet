@@ -30,6 +30,7 @@ We were using Linux build-based ARM64 processors and to avoid using third-party 
 To create the cytomask, you need to place the cell_outline.mod file in the same directory as the tomogram.
 You use the same script to build your pipeline, in case you are interested in all vesicles in tomograms you can set  in all vesicles within_segmentation_region = False.
 We used object object-orientated approach to build the pipeline. You can use the following [script](notebooks/single_dataset.py) to build your pipeline and run different steps of the pipeline.
+
 In step 5 regarding using the pretrain network you need to set up the rescale factor proportional to the training dataset pixel size which is 22.40 Angstrom.
 The steps are briefly explained as follows:
 
