@@ -360,12 +360,12 @@ class Pipeline():
         if within_segmentation_region:
             self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
         opt_th, _ = segseg.find_threshold(self.image, self.deep_mask)
-        print("why - start")
+        # print("why - start")
         image_label_opt = skimage.morphology.label(self.deep_mask > opt_th)
         deep_labels = image_label_opt
         # _, deep_labels = segseg.mask_clean_up(image_label_opt)
         self.deep_labels = deep_labels.astype(np.uint16)
-        print("why - end")
+        # print("why - end")
         cryovesnet.save_label_to_mrc(self.deep_labels, self.deep_labels_path, template_path=self.image_path)
         # free up memory
         self.last_output_array_name = 'deep_labels'
