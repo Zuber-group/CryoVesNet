@@ -149,7 +149,8 @@ If you utilize our software in your research, please acknowledge its use by citi
 	elocation-id = {2024.02.26.582080},
 	year = {2024},
 	doi = {10.1101/2024.02.26.582080},
-	URL = {https://www.biorxiv.org/content/10.1101/2024.02.26.582080v1},
+	URL = {https://www.biorxiv.org/content/early/2024/02/28/2024.02.26.582080},
+	eprint = {https://www.biorxiv.org/content/early/2024/02/28/2024.02.26.582080.full.pdf},
 	journal = {bioRxiv}
 }
 </p></details>
