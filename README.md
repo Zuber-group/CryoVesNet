@@ -139,7 +139,7 @@ This repository includes scripts or code from external packages. To ensure integ
 
 ## Citation
 
-If you utilize our software in your research, please acknowledge its use by citing this work. Our software may integrate or rely on various third-party tools; hence, we recommend citing those as appropriately detailed in thire documentation.
+If you utilize our software in your research, please acknowledge its use by citing this work. Our software may integrate or rely on various third-party tools; hence, we recommend citing those as appropriately detailed in their documentation.
 
 <details><summary>Bibtex</summary><p>
     
