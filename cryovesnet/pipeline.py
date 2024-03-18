@@ -235,10 +235,11 @@ class Pipeline():
         Merged vesicle_segmentation and run_deep to make it a pipeline method
         all output files are saved in self.deep_dir
         """
-        print("CryoVesNet pipeline: Running unet segmentation if there are less than 7 file in ./deep directory")
+        
         self.prepare_deep(erase_existing=force_run)
-        if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 1 and not force_run:
+        if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 4 and not force_run:
             return
+        print("CryoVesNet pipeline: Running unet segmentation if there are less than 4 file in ./deep directory")
         segseg.full_segmentation(self.network_size, str(self.unet_weight_path.absolute()), self.image_path,
                                  self.deep_dir, rescale=rescale, gauss=True)
 
