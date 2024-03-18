@@ -137,5 +137,25 @@ The notebooks allow to [generate the training data](notebooks/create_trainingset
 
 This repository includes scripts or code from external packages. To ensure integration or extended capabilities, inclusions is from the [Pyto](https://github.com/vladanl/Pyto) project. In case you want to segemnt the connectors and teathers afterwards you can use this software.
 
+## Citation
+
+If you utilize our software in your research, please acknowledge its use by citing this work. Our software may integrate or rely on various third-party tools; hence, we recommend citing those as appropriately detailed in thire documentation.
+
+<details><summary>Bibtex</summary><p>
+    
+@article {Khosrozadeh2024.02.26.582080,
+	author = {Amin Khosrozadeh and Raphaela Seeger and Guillaume Witz and Julika Radecke and Jakob B. S{\o}rensen and Beno{\^\i}t Zuber},
+	title = {CryoVesNet: A Dedicated Framework for Synaptic Vesicle Segmentation in Cryo Electron Tomograms},
+	elocation-id = {2024.02.26.582080},
+	year = {2024},
+	doi = {10.1101/2024.02.26.582080},
+	URL = {https://www.biorxiv.org/content/early/2024/02/28/2024.02.26.582080},
+	journal = {bioRxiv}
+}
+</p></details>
+
+
+
+
 ## Schematic Workflow
 ![Pipeline](images/github_figure.png)
