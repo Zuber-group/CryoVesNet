@@ -15,12 +15,14 @@ You can install the package using conda and pip. After cloning the repository, y
 <pre> conda create -n cryoVesNet python=3.9</pre>
 3. Activate the conda environment
 <pre>  conda activate cryoVesNet </pre>
-4. Install the pre-requirements
+4. Qt Backend
+<pre>  conda install pyqt qtpy </pre>
+5. Install the pre-requirements
 <pre>  pip install -e . </pre>
 
 
-
-
+> **Troubleshooting:**
+In case you face error that Qt bindings couldn't be found you can try to force to reinstall with <pre>conda install pyqt qtpy --force-reinstall</pre>
 
 > **Warning:**
 We were using Linux build-based ARM64 processors and to avoid using third-party build and any conflict we used tensorflow<2.10 and numpy<1.24 to avoid any conflict. We are working on the new version of the project which will be compatible with all the latest versions of the libraries.
