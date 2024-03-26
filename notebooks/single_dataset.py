@@ -7,14 +7,14 @@ os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 import cryovesnet
 
-dataset_directory = "/mnt/data/amin/Handpicked/133/"
+dataset_directory = "/mnt/data/amin/cleaned/ipsc/"
 
 
 pl2 = cryovesnet.Pipeline(dataset_directory)
 pl2.network_size=64
 pl2.setup_cryovesnet_dir()
-pl2.run_deep(force_run=True, rescale=0.5)
-pl2.zoom(force_run=True,)
+pl2.run_deep()
+pl2.zoom()
 pl2.label_vesicles(within_segmentation_region=True)
 pl2.label_vesicles_simply(within_segmentation_region = True, input_array_name="deep_mask")
 pl2.make_spheres('clean_deep_labels')

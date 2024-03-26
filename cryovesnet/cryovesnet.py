@@ -17,8 +17,9 @@ from pathlib import Path
 import math
 from . import evaluation_class
 from scipy.spatial import distance_matrix
-
-
+import warnings
+warnings.filterwarnings("ignore")
+os.environ["TF_CPP_MIN_LOG_LEVEL"]="2"
 
 def get_voxel_size_in_nm(path_to_file):
     with mrcfile.open(path_to_file, header_only=True) as tomo:

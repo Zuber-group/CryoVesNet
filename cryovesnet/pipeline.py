@@ -107,7 +107,7 @@ class Pipeline():
         self.voxel_size = cryovesnet.get_voxel_size_in_nm(self.image_path)
         self.min_radius = cryovesnet.min_radius_of_vesicle(self.voxel_size)
         self.min_vol = cryovesnet.min_volume_of_vesicle(self.voxel_size)
-
+        print("Pixel size: ", self.voxel_size)
         if self.image_path.exists():
             self.set_array('image')
         # if self.sphere_df_path.exists():
@@ -230,18 +230,20 @@ class Pipeline():
         tf.keras.backend.set_session(tf.Session(config=config))
         self.network_size = 64
 
-    def run_deep(self, force_run=False, rescale=0.5):
+    def run_deep(self, force_run=False, rescale=None):
         """
         Merged vesicle_segmentation and run_deep to make it a pipeline method
         all output files are saved in self.deep_dir
         """
-        
+        if rescale==None:
+            rescale=self.voxel_size*10/22.40 #in case you use the pre-trained model
         self.prepare_deep(erase_existing=force_run)
         if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 4 and not force_run:
             return
         print("CryoVesNet pipeline: Running unet segmentation if there are less than 4 file in ./deep directory")
         segseg.full_segmentation(self.network_size, str(self.unet_weight_path.absolute()), self.image_path,
                                  self.deep_dir, rescale=rescale, gauss=True)
+
 
     def run_deep_at_multiple_rescale(self, max_voxel_size=3.14, min_voxel_size=1.57, nsteps=8):
         self.set_array('image')
