@@ -294,7 +294,7 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
-    def label_vesicles_simply(self, input_array_name='deep_mask', threshold_coef=1.0, within_segmentation_region=True,
+    def label_vesicles_simply(self, input_array_name='deep_mask', threshold_coef=1.0, expanding=False,
                               memkill=True):
         # threshold_coef=0.986
 
@@ -321,15 +321,15 @@ class Pipeline():
         ves_table = cryovesnet.vesicles_table(deep_labels)
         deep_labels = cryovesnet.collision_solver(self.deep_mask, deep_labels, ves_table, threshold, delta_size=1)
 
+        if expanding:
+            deep_labels, small_labels = cryovesnet.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol, p=1, q=4, t=0.8)
 
-        deep_labels, small_labels = cryovesnet.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol, p=1, q=4, t=0.8)
-
-        if len(small_labels):
-            print(
-                "The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
-            print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
-            print(small_labels)
-            deep_labels[np.isin(deep_labels, small_labels.index)] = 0
+            if len(small_labels):
+                print(
+                    "The following labels are too small and couldn't be expanded with decreasing deep mask threshold. Therefore they were removed.")
+                print("You may want to inspect the region of their centroid, as they may correspond to missed vesicles.")
+                print(small_labels)
+                deep_labels[np.isin(deep_labels, small_labels.index)] = 0
 
 
         deep_labels = cryovesnet.pacman_killer(deep_labels)
