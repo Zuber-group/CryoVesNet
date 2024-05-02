@@ -247,6 +247,7 @@ class Pipeline():
         if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 4 and not force_run:
             return
         print("CryoVesNet pipeline: Running unet segmentation if there are less than 4 file in ./deep directory")
+        # segseg.full_segmentation(weight_path, self.image_path, self.deep_dir, rescale=rescale, gauss=True)
         segseg.full_segmentation(weight_path, self.image_path, self.deep_dir, rescale=rescale, gauss=True)
 
 
@@ -368,7 +369,7 @@ class Pipeline():
         if within_segmentation_region:
             self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
         opt_th, _ = segseg.find_threshold(self.image, self.deep_mask)
-        print("Threshold: ", opt_th)
+        # opt_th = 0
         # print("why - start")
         image_label_opt = skimage.morphology.label(self.deep_mask > opt_th)
         deep_labels = image_label_opt
@@ -573,16 +574,7 @@ class Pipeline():
             input_array_name = self.last_output_array_name
         self.set_array('image')
         self.set_array(input_array_name)
-        points_to_remove, points_to_add, points_to_add_sizes = visualization.add_points_remove_labels(self,
-                                                                                                      getattr(self,
-                                                                                                              input_array_name))
-        minimum_box_size = self.voxel_size * 50
-        self.mancorr_labels = cryovesnet.remove_labels_under_points(getattr(self, input_array_name), points_to_remove)
-        self.mancorr_labels = cryovesnet.add_sphere_labels_under_points(self.image, self.mancorr_labels, points_to_add,
-                                                                        points_to_add_sizes, minimum_box_size)
-        self.last_output_array_name = 'mancorr_labels'
-        print('Last save procedures')
-        cryovesnet.save_label_to_mrc(self.mancorr_labels, self.mancorr_labels_path, template_path=self.image_path)
+        visualization.add_points_remove_labels(self)
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()

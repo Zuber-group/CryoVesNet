@@ -5,7 +5,7 @@ import os
 warnings.filterwarnings("ignore")
 os.environ["TF_CPP_MIN_LOG_LEVEL"]="2"
 # Here you can choose which GPU to use
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+os.environ["CUDA_VISIBLE_DEVICES"]="2"
 
 import cryovesnet
 
@@ -33,7 +33,7 @@ dataset_directory = "/media/amin/mtwo/Handpicked/"
 def single_dataset_handler(directory):
     pl = cryovesnet.Pipeline(directory)
     pl.setup_cryovesnet_dir()
-    pl.run_deep(force_run=True, rescale=None, weight_path='/mnt/data/Amin/Data/training_logs/20240429-224708_train_dataset_64_synaptasome_8000_64/weights_best_loss.h5')
+    pl.run_deep(force_run=True, rescale=None, weight_path='/mnt/data/Amin/Data/training_logs/20240502-113341_train_dataset_64_synaptasome_8000_64/weights_best_dice.h5')
     pl.zoom(force_run=True, )
     pl.label_vesicles(within_segmentation_region = True)
     pl.label_vesicles_simply(expanding = False,input_array_name="deep_mask")

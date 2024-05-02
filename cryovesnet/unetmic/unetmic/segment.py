@@ -14,10 +14,10 @@ from . import segment as segment
 from tensorflow.keras.models import load_model
 
 
-def find_threshold(image, image_mask):
+def find_threshold(image, image_mask,min_th=0.8,max_th=1,step=0.01):
     # first, calculate shell-intensity at different thresholds
     shell_pixels = []
-    for th in tqdm(np.arange(0.8, 1, 0.01), desc='finding global threshold on unet mask'):
+    for th in tqdm(np.arange(min_th, max_th, step), desc='finding global threshold on unet mask'):
         image_mask_bin = np.zeros(image_mask.shape)
         image_mask_bin[image_mask > th] = 1
 
@@ -28,7 +28,7 @@ def find_threshold(image, image_mask):
 
     mean_shell_val = [np.mean(x) for x in shell_pixels]
     # find optimal threshold
-    opt_th = np.arange(0.8, 1, 0.01)[np.argmin(mean_shell_val)]
+    opt_th = np.arange(min_th, max_th, step)[np.argmin(mean_shell_val)]
 
     return opt_th, mean_shell_val
 
@@ -92,7 +92,7 @@ def full_segmentation(unet_weigth_path, path_to_file, folder_to_save, rescale=1,
     if gauss:
         image = skimage.filters.gaussian(image, preserve_range=True).astype(np.int16)
 
-    if (rescale == 1) or gauss:
+    if (rescale != 1) or gauss:
         skimage.io.imsave(os.path.normpath(folder_to_save) + '/' + os.path.splitext(os.path.split(path_to_file)[1])[
             0] + '_processed.tiff',
                           image, plugin='tifffile')
