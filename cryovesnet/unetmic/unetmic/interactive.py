@@ -1,7 +1,7 @@
 import numpy as np
 
 def get_label(layer, event):
-    cords = np.round(layer.coordinates).astype(int)
+    cords = np.round(layer.coordinates).astype(np.int16)
     val = layer.get_value()
     if val is None:
         return

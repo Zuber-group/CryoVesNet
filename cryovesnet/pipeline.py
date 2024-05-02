@@ -228,21 +228,27 @@ class Pipeline():
         config = tf.ConfigProto()
         config.gpu_options.allow_growth = False
         tf.keras.backend.set_session(tf.Session(config=config))
-        self.network_size = 64
+        # self.network_size = 64
 
-    def run_deep(self, force_run=False, rescale=None):
+    def run_deep(self, force_run=False, rescale=None, weight_path=None):
         """
         Merged vesicle_segmentation and run_deep to make it a pipeline method
         all output files are saved in self.deep_dir
         """
         if rescale==None:
             rescale=self.voxel_size*10/22.40 #in case you use the pre-trained model
+            # rescale = self.voxel_size * 10 / 14.69  # in case you use the pre-trained model
+
+        if weight_path is None:
+            weight_path = str(self.unet_weight_path.absolute())
+
+        print("Rescale Factor: ",rescale)
         self.prepare_deep(erase_existing=force_run)
         if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 4 and not force_run:
             return
         print("CryoVesNet pipeline: Running unet segmentation if there are less than 4 file in ./deep directory")
-        segseg.full_segmentation(self.network_size, str(self.unet_weight_path.absolute()), self.image_path,
-                                 self.deep_dir, rescale=rescale, gauss=True)
+        segseg.full_segmentation(weight_path, self.image_path, self.deep_dir, rescale=rescale, gauss=True)
+
 
 
     def run_deep_at_multiple_rescale(self, max_voxel_size=3.14, min_voxel_size=1.57, nsteps=8):
@@ -332,7 +338,7 @@ class Pipeline():
                 deep_labels[np.isin(deep_labels, small_labels.index)] = 0
 
 
-        deep_labels = cryovesnet.pacman_killer(deep_labels)
+        # deep_labels = cryovesnet.pacman_killer(deep_labels)
         ves_table = cryovesnet.vesicles_table(deep_labels)
         deep_labels,badVesicles = cryovesnet.remove_outliers(deep_labels, ves_table, self.min_vol)
 
@@ -362,6 +368,7 @@ class Pipeline():
         if within_segmentation_region:
             self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
         opt_th, _ = segseg.find_threshold(self.image, self.deep_mask)
+        print("Threshold: ", opt_th)
         # print("why - start")
         image_label_opt = skimage.morphology.label(self.deep_mask > opt_th)
         deep_labels = image_label_opt
@@ -814,10 +821,10 @@ class Pipeline():
         a = []
         a0 = [evaluator1.former_dice(), evaluator2.former_dice(), evaluator3.former_dice(), evaluator4.former_dice(), evaluator5.former_dice()]
         a += a0
-        for ppp in [0.0]:
-            a1 = cryovesnet.objectwise_evalution(reff, corrected_labels, proportion=ppp)
-            a2 = cryovesnet.objectwise_evalution(corrected_labels, reff, proportion=ppp)
-            a += a1
-            a += a2
-        self.clear_memory()
+        # for ppp in [0.0]:
+        #     a1 = cryovesnet.objectwise_evalution(reff, corrected_labels, proportion=ppp)
+        #     a2 = cryovesnet.objectwise_evalution(corrected_labels, reff, proportion=ppp)
+        #     a += a1
+        #     a += a2
+        # self.clear_memory()
         return a

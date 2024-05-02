@@ -198,7 +198,7 @@ def my_threshold(image, image_mask):
         image_mask_bin = np.zeros(image_mask.shape)
         image_mask_bin[image_mask > th] = 1
 
-        image_mask_bin_erode = skimage.morphology.binary_erosion(image_mask_bin, selem=skimage.morphology.ball(1))
+        image_mask_bin_erode = skimage.morphology.binary_erosion(image_mask_bin, footprint=skimage.morphology.ball(1))
         image_shell = image_mask_bin - image_mask_bin_erode
 
         shell_pixels.append(image[image_shell.astype(bool)])
@@ -214,7 +214,7 @@ def adjust_shell_intensity(image_int, image_labels):
     # calculate the mean shell value in the original segmentation.
     mask_adjusted = image_labels.copy()
     # create a slightly eroded version of the region
-    image_mask_bin_erode = skimage.morphology.binary_erosion(mask_adjusted, selem=skimage.morphology.ball(1))
+    image_mask_bin_erode = skimage.morphology.binary_erosion(mask_adjusted, footprint=skimage.morphology.ball(1))
     # combine original image and eroded one to keep only the shell
     image_shell = mask_adjusted ^ image_mask_bin_erode
     # recover pixels in the shell and calculate their mean intensity
@@ -224,8 +224,8 @@ def adjust_shell_intensity(image_int, image_labels):
     best_value = np.mean(shell_pixels)
     best_mask = image_labels.copy()
     for i in range(1, 8):
-        mask_adjusted = skimage.morphology.binary_dilation(image_labels, selem=skimage.morphology.ball(i))
-        image_mask_bin_erode = skimage.morphology.binary_erosion(mask_adjusted, selem=skimage.morphology.ball(1))
+        mask_adjusted = skimage.morphology.binary_dilation(image_labels, footprint=skimage.morphology.ball(i))
+        image_mask_bin_erode = skimage.morphology.binary_erosion(mask_adjusted, footprint=skimage.morphology.ball(1))
         image_shell = mask_adjusted ^ image_mask_bin_erode
         shell_pixels = image_int[image_shell.astype(bool)]
         meanval = np.mean(shell_pixels)
@@ -415,7 +415,7 @@ def get_sphere_dataframe(image, image_label, margin=5):
     thicknesses, densities, radii, centers, kept_labels,my_radial = [],[],[],[],[],[]
     for i in tqdm(range(len(vesicle_regions)), desc="fitting sphere to vesicles"):
         radius = get_label_largest_radius(bboxes[i])  #this is an integer
-        rounded_centroid = np.round(centroids[i]).astype(np.int) #this is an array of integers
+        rounded_centroid = np.round(centroids[i]).astype(np.int16) #this is an array of integers
         label = labels[i]
         density, keep_label, new_centroid, new_radius, thickness, radial = get_sphere_parameters(image, label, margin, radius,
                                                                                          rounded_centroid)
@@ -436,7 +436,7 @@ def get_sphere_parameters(image, label, margin, radius, rounded_centroid):
     try:
         if label not in  [72]:
             shift, new_radius = get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, margin=margin)
-            new_centroid = (rounded_centroid - shift).astype(np.int)
+            new_centroid = (rounded_centroid - shift).astype(np.int16)
             image_box = extract_box_of_radius(image, new_centroid, radius + margin)
             thickness, density, radial = get_sphere_membrane_thickness_and_density_from_image(image_box)
             keep_label = True
@@ -503,7 +503,7 @@ def add_sphere_in_dict(sphere_dict, radius):
     sphere_dict[radius] = skimage.morphology.ball(radius)
 
 def remove_labels_under_points(image_label, points_to_remove):
-    labels_to_remove = np.unique([image_label[a,b,c] for a,b,c in np.round(points_to_remove).astype(int)])
+    labels_to_remove = np.unique([image_label[a,b,c] for a,b,c in np.round(points_to_remove).astype(np.int16)])
     selection_mask = np.isin(image_label, labels_to_remove)
     corrected_labels = image_label.copy()
     corrected_labels[selection_mask] = 0
@@ -522,7 +522,7 @@ def expand_small_labels(deep_mask, labels, initial_threshold, min_vol,p,q,t):
         small_labels_fixed = []
         for label, row in small_labels.iterrows():
             centroid = (row['centroid-0'],row['centroid-1'],row['centroid-2'])
-            centroid = tuple(np.array(centroid).astype(np.int))
+            centroid = tuple(np.array(centroid).astype(np.int16))
             new_label = labels[centroid]
             if (new_label) == 0:
                 pass
@@ -620,7 +620,7 @@ def add_sphere_labels_under_points(image, image_labels, points_to_add,
     corrected_labels = image_labels.copy()
     max_label = image_labels.max()
     for i, point in enumerate(points_to_add):
-        rounded_centroid = np.round(point).astype(int)
+        rounded_centroid = np.round(point).astype(np.int16)
         point_size = points_to_add_sizes[i]
         radius = int(max(point_size, minimum_box_size)//2)
         label = i + max_label + 1
@@ -758,7 +758,7 @@ def is_label_enclosed_in_image(image_bounding_box, rounded_3d_centroid, radius):
 
 def get_bounding_box_from_centroid_and_radius(rounded_3d_centroid, radius):
     bounding_box = np.zeros((3,2), dtype=int)
-    rounded_3d_centroid = np.round(rounded_3d_centroid).astype(int)
+    rounded_3d_centroid = np.round(rounded_3d_centroid).astype(np.int16)
     radius = int(round(radius))
     bounding_box[:,0] = rounded_3d_centroid - radius
     bounding_box[:,1] = rounded_3d_centroid + radius
@@ -796,7 +796,7 @@ def extract_extended_box(image, bbox, extension):
 
 
 def get_extended_bbox(bbox, extension):
-    bbox = bbox.astype(int)
+    bbox = bbox.astype(np.int16)
     extended_bbox = np.zeros((bbox.shape), dtype=int)
     for i in range(3):
         for j, sign in enumerate((-1,1)):
@@ -809,12 +809,12 @@ def get_center_of_bbox(bbox):
     not in the image coordinate system
     """
     center = (bbox[:,1] - bbox[:,0]) // 2
-    center = center.astype(int)
+    center = center.astype(np.int16)
     return center
 
 
 def extract_box(image, bbox):
-    bbox = bbox.astype(int)
+    bbox = bbox.astype(np.int16)
     clipped_bbox = clip_box_to_image_size(image, bbox)
     sub_image = image[clipped_bbox[0,0]:clipped_bbox[0,1],
                       clipped_bbox[1,0]:clipped_bbox[1,1],
@@ -850,7 +850,7 @@ def get_label_largest_radius(bbox):
 def get_label_radii(bbox):
     #this function is equivalent to get_center_of_bbox
     radii = (bbox[:,1] - bbox[:,0]) // 2
-    radii = radii.astype(int)
+    radii = radii.astype(np.int16)
     return radii
 
 def main():
@@ -884,7 +884,7 @@ def embed_array_in_array(small_array, large_array, start_coordinates=(0,0,0)):
     return large_array
 
 def embed_array_in_array_centered(small_array, large_array):
-    start_coordinates = ((np.array(large_array.shape) - np.array(small_array.shape))//2).astype(int)
+    start_coordinates = ((np.array(large_array.shape) - np.array(small_array.shape))//2).astype(np.int16)
     return embed_array_in_array(small_array, large_array, start_coordinates=start_coordinates)
 
 def get_radial_profile(image, origin=None):
@@ -895,7 +895,7 @@ def get_radial_profile(image, origin=None):
         origin = np.array(image.shape)//2
     z, y, x = np.indices((image.shape))
     r = np.sqrt((x - origin[0])**2 + (y - origin[1])**2 + (z - origin[2])**2)
-    r = r.astype(np.int)
+    r = r.astype(np.int16)
     tbin = np.bincount(r.ravel(), image.ravel())
     nr = np.bincount(r.ravel())
     radial_profile = tbin / nr
@@ -908,7 +908,7 @@ def get_3d_radial_average_from_profile(radial_profile,image_shape):
     #radial profile.
     a, b, c = [s//2 for s in image_shape]
     z, y, x = np.mgrid[-a:a, -b:b, -c:c]
-    rback = np.sqrt(x ** 2 + y ** 2 + z ** 2).astype(np.int)
+    rback = np.sqrt(x ** 2 + y ** 2 + z ** 2).astype(np.int16)
     radial_average_3d = radial_profile[rback]
     return radial_average_3d
 
@@ -970,7 +970,7 @@ def get_optimal_sphere_radius_from_image(image):
 
 def get_shift_between_images(reference_image, moving_image):
     try:
-        shift, _, _ = skimage.registration.phase_cross_correlation(reference_image, moving_image)
+        shift, _, _ = skimage.registration.phase_cross_correlation(reference_image, moving_image,normalization=None)
     except ValueError:
         shift = np.zeros(3)
         print("get_shift_between_images failed, shift set to 0,0,0")
@@ -992,7 +992,7 @@ def get_optimal_sphere_position_and_radius(image, rounded_centroid, radius, marg
         if np.linalg.norm(total_shift) > max_shift:
             total_shift -= shift
             break
-        new_centroid = (rounded_centroid - total_shift).astype(np.int)
+        new_centroid = (rounded_centroid - total_shift).astype(np.int16)
         if np.all(shift == np.zeros(3)):
             no_change_count += 1
         if no_change_count > 1:
