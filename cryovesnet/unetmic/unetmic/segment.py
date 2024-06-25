@@ -12,7 +12,14 @@ from tqdm import tqdm
 from . import unetmic as umic
 from . import segment as segment
 from tensorflow.keras.models import load_model
+from scipy.special import expit, logit
 
+
+def sigmoid(x):
+    return expit(x)
+
+def inverse_sigmoid(x):
+    return logit(x)
 
 def find_threshold(image, image_mask,min_th=0.8,max_th=1,step=0.01):
     # first, calculate shell-intensity at different thresholds
@@ -57,7 +64,7 @@ def mask_clean_up(image_label, background=0):
     return clean_mask, image_label
 
 
-def full_segmentation(unet_weigth_path, path_to_file, folder_to_save, rescale=1, gauss=False, input_size_multiplier=2):
+def full_segmentation(unet_weigth_path, path_to_file, folder_to_save, rescale=1, gauss=False, augmentation_level=4, combine_method='average'):
     # load the network and weights
     # network_size=32
     # unet_vesicle = umic.create_unet_3d(inputsize=(network_size, network_size, network_size, 1), n_depth=2,
@@ -77,20 +84,25 @@ def full_segmentation(unet_weigth_path, path_to_file, folder_to_save, rescale=1,
         train_network_size = unet_vesicle.input.shape[1].value
         n_filter_base = {32: 16, 64: 32}[train_network_size]
         n_depth = {32: 2, 64: 3}[train_network_size]
+        input_size_multiplier = {32: 2, 64: 2}[train_network_size]
         inference_input_size = train_network_size * input_size_multiplier
         unet_vesicle = umic.create_unet_3d(inputsize=(*([inference_input_size] * 3), 1), n_depth=n_depth,
                                            n_filter_base=n_filter_base, batch_norm=True, dropout=0.0, n_conv_per_depth=2)
         unet_vesicle.load_weights(unet_weigth_path)
     else:
-
+        type_of_2d=unet_weigth_path.split('/')[-2].split('_')[-1]
+        print("Type of 2D network: ", type_of_2d)
+        train_network_size = unet_vesicle.input.shape[1].value
+        unet_vesicle= umic.create_unet_2d(inputsize=train_network_size*2, network_name=type_of_2d)
         unet_vesicle.load_weights(unet_weigth_path)
+
     # load image
     image = umic.load_raw(path_to_file)
     # rescale
     if rescale != 1:
         image = skimage.transform.rescale(image, scale=rescale, preserve_range=True).astype(np.int16)
     if gauss:
-        image = skimage.filters.gaussian(image, preserve_range=True).astype(np.int16)
+        image = skimage.filters.gaussian(image, sigma=1 ,  preserve_range=True).astype(np.int16)
 
     if (rescale != 1) or gauss:
         skimage.io.imsave(os.path.normpath(folder_to_save) + '/' + os.path.splitext(os.path.split(path_to_file)[1])[
@@ -100,9 +112,58 @@ def full_segmentation(unet_weigth_path, path_to_file, folder_to_save, rescale=1,
     image = (image - np.mean(image)) / np.std(image)
     # do training
     if (len(unet_vesicle.input.shape) > 4):
+        roi = {32: 24, 64: 48}[train_network_size]
+        layer_name = unet_vesicle.layers[-1].name
+        unet_vesicle.layers[-1].activation = None
+        unet_vesicle.get_layer(layer_name).output
+        # image_mask = umic.run_segmentation(image, unet_vesicle, roi=roi)
 
-        image_mask = umic.run_segmentation(image, unet_vesicle)
-        # save raw output as npy
+        def augmentations(image, n=8):
+            transforms = [
+                (image, lambda x: x),  # No transformation
+                (np.flip(image, axis=2), lambda x: np.flip(x, axis=2)),  # Flip along axis 0
+                (np.flip(image, axis=1), lambda x: np.flip(x, axis=1)),  # Flip along axis 1
+                (np.flip(image, axis=0), lambda x: np.flip(x, axis=0)),  # Flip along axis 2
+                (np.rot90(image, k=1, axes=(0, 1)), lambda x: np.rot90(x, k=3, axes=(0, 1))),
+                # Rotate 90 degrees and back
+                (np.rot90(image, k=1, axes=(0, 2)), lambda x: np.rot90(x, k=3, axes=(0, 2))),
+                # Rotate 90 degrees and back
+                (np.rot90(image, k=1, axes=(1, 2)), lambda x: np.rot90(x, k=3, axes=(1, 2))),
+                # Rotate 90 degrees and back
+                (np.rot90(np.flip(image, axis=0), k=1, axes=(0, 1)),
+                 lambda x: np.flip(np.rot90(x, k=3, axes=(0, 1)), axis=0))  # Flip and rotate 90 degrees and back
+            ]
+            return transforms[:n]
+
+        # Generate all augmentations
+        augmented_images = augmentations(image, n= augmentation_level)
+
+        # Run segmentation on all augmentations
+        segmented_masks = []
+        for aug_image, retransform in augmented_images:
+            segmented_mask = umic.run_segmentation(aug_image, unet_vesicle, roi=roi)
+            print(segmented_mask.shape)
+            segmented_mask = retransform(segmented_mask)
+            print(segmented_mask.shape)
+            segmented_masks.append(segmented_mask)
+            # K.clear_session()
+
+
+
+        # combine_method = 'average'
+        # Combine the logits
+        if combine_method == 'max':
+            combined_mask = np.maximum.reduce(segmented_masks)
+        elif combine_method == 'average':
+            logits = [inverse_sigmoid(mask) for mask in segmented_masks]
+            combined_logits = np.mean(logits, axis=0)
+            combined_mask = sigmoid(combined_logits)
+        else:
+            raise ValueError("Invalid combine_method. Use 'max' or 'average'.")
+
+        # Apply sigmoid to the combined logits
+        # combined_mask = sigmoid(combined_logits)
+        image_mask = combined_mask
         umic.save_seg_output(image_mask, path_to_file, folder_to_save)
     else:
         image_mask = umic.run_segmentation_2d(image, unet_vesicle)

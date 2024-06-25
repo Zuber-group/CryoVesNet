@@ -25,6 +25,10 @@ import mrcfile
 from tqdm import tqdm
 from scipy.stats import chi2, pearsonr, spearmanr
 from collections.abc import Iterable
+import subprocess
+import shutil
+from sklearn.metrics import roc_curve, auc
+import matplotlib.pyplot as plt
 
 try:
     import tensorflow.compat.v1 as tf
@@ -39,9 +43,32 @@ except ModuleNotFoundError:
 if platform.system() == 'Darwin': os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
 
+def load_raw(path_to_file):
+    if os.path.splitext(os.path.split(path_to_file)[1])[1] == '.tif':
+        image = skimage.io.imread(path_to_file)
+
+    else:
+        image = mrcfile.open(path_to_file)
+        image = image.data
+
+    return image
+
+
+def convert_mrc_to_npy(mrc_file_path, output_path):
+    # Open the MRC file and read the data
+    with mrcfile.open(mrc_file_path, mode='r') as mrc:
+        data = mrc.data
+
+    # Prepare the output file path
+    # npy_file_path = os.path.splitext(mrc_file_path)[0] + '.npy'
+
+    # Save the data to a .npy file
+    np.save(output_path, data)
+
+
 class Pipeline():
 
-    def __init__(self, path_to_folder):
+    def __init__(self, path_to_folder, pattern='*.rec.nad'):
         # BZ replaced self.path_to_folder by self.dir
         self.dir = Path(path_to_folder).absolute()
         print(f"CryoVesNet Pipeline: the pipeline is created for {self.dir}")
@@ -49,7 +76,7 @@ class Pipeline():
         self.deep_dir = self.dir / 'deep'
         self.save_dir = self.dir / 'cryovesnet'
         self.pyto_dir = self.dir / 'pyto'
-        pattern = '*.rec.nad'
+        pattern = pattern
         # pattern = '*.rec'
         print(pattern)
         try:
@@ -137,7 +164,7 @@ class Pipeline():
             setattr(self, array_name, getattr(self, array_name).astype(datatype))
         return array_name
 
-    def set_segmentation_region_from_mod(self, datatype=np.uint8, force_generate=False):
+    def set_segmentation_region_from_mod(self, datatype=np.uint8, force_generate=True):
         if (not self.cytomask_path.exists()) or force_generate:
             cmd = f"imodmop -mode 6 -o 1 -mask 1 \"{self.cell_outline_mod_path}\" \"{self.image_path}\" \"{self.cytomask_path}\""
             os.system(cmd)
@@ -202,8 +229,8 @@ class Pipeline():
             my_list = [obj]
         return my_list
 
-    def check_files(self, file_list=['dir', 'image_path',
-                                     'cell_outline_mod_path']):
+    # def check_files(self, file_list=['dir', 'image_path','cell_outline_mod_path']):
+    def check_files(self, file_list=['dir', 'image_path']):
         """
         Check if all input files as specified in file_list exist
         """
@@ -230,13 +257,46 @@ class Pipeline():
         tf.keras.backend.set_session(tf.Session(config=config))
         # self.network_size = 64
 
-    def run_deep(self, force_run=False, rescale=None, weight_path=None):
+    def run_membrain(self, path_to_model= '/home/amin/membrain-seg/checkpoints/checkpoints/membrain-seg_v0_1-epoch=999-val_loss=0.52.ckpt', force_run=False):
+        # We call the bash script ./membrain_segment_link.sh path_to_tomogram path_to_model output_dir
+
+
+        # load image
+        image = load_raw(self.image_path)
+        rescale = self.voxel_size * 10 / 22.40
+        self.prepare_deep(erase_existing=force_run)
+        scaled_image_path = os.path.normpath(self.deep_dir) + '/' + \
+                            os.path.splitext(os.path.split(self.image_path)[1])[0] + '_processed.mrc'
+        if not os.path.exists(scaled_image_path) or force_run:
+            # rescale
+            image = skimage.transform.rescale(image, scale=rescale, preserve_range=True).astype(np.int16)
+            with mrcfile.new(scaled_image_path, overwrite=True) as mrc:
+                mrc.set_data(image.astype(np.int16))
+        if os.path.exists(self.binned_deep_mask_path) and not force_run:
+            return
+        result = subprocess.call(f"/home/amin/PycharmProjects/CryoVesNetNEW/notebooks/membrain_segment_link.sh {scaled_image_path} {path_to_model} {self.deep_dir}".split())
+
+        if result != 0:
+            raise ValueError("Membrain failed to segment the image")
+
+        # use shutil to move  self.deep_dir / (self.image_path.stem + '_scores.mrc'):
+
+        # shutil.move(scaled_image_path[:-4]+ '_scores.mrc', self.binned_deep_mask_path)
+
+        convert_mrc_to_npy(scaled_image_path[:-4]+ '_scores.mrc',self.binned_deep_mask_path)
+
+
+
+
+
+
+    def run_deep(self, force_run=False, rescale=None, gauss=True, augmentation_level=1, weight_path=None):
         """
         Merged vesicle_segmentation and run_deep to make it a pipeline method
         all output files are saved in self.deep_dir
         """
         if rescale==None:
-            rescale=self.voxel_size*10/22.40 #in case you use the pre-trained model
+            rescale=self.voxel_size*10/22 #in case you use the pre-trained model
             # rescale = self.voxel_size * 10 / 14.69  # in case you use the pre-trained model
 
         if weight_path is None:
@@ -248,7 +308,7 @@ class Pipeline():
             return
         print("CryoVesNet pipeline: Running unet segmentation if there are less than 4 file in ./deep directory")
         # segseg.full_segmentation(weight_path, self.image_path, self.deep_dir, rescale=rescale, gauss=True)
-        segseg.full_segmentation(weight_path, self.image_path, self.deep_dir, rescale=rescale, gauss=True)
+        segseg.full_segmentation(weight_path, self.image_path, self.deep_dir, rescale=rescale, gauss=gauss, augmentation_level=augmentation_level)
 
 
 
@@ -270,16 +330,21 @@ class Pipeline():
         self.deep_winners_mask = deep_winners_mask
         cryovesnet.save_label_to_mrc(self.deep_winners_mask, self.deep_winners_mask_path, template_path=self.image_path)
 
-    def setup_cryovesnet_dir(self, make_masks=True, memkill=True):
+    def setup_cryovesnet_dir(self, make_masks=True, initialize=False, memkill=True):
         print("CryoVesNet Pipeline: setting up cryovesnet directory")
         self.save_dir.mkdir(exist_ok=True)
+        if initialize:
+            self.deep_labels = np.zeros(self.image_shape, dtype=np.uint16)
+            cryovesnet.save_label_to_mrc(self.deep_labels, self.deep_labels_path, template_path=self.image_path)
+            self.last_output_array_name = "deep_labels"
+        print(self.save_dir)
         if make_masks:
             self.set_segmentation_region_from_mod()
             # self.set_active_zone_array_from_mod()
         if memkill:
             self.clear_memory()
 
-    def zoom(self, force_run=False, memkill=True):
+    def zoom(self, force_run=False, slice_range=None,memkill=True):
         """
         Zoom the deep mask
         :param memkill:
@@ -295,41 +360,67 @@ class Pipeline():
         self.set_array('image')
         self.deep_mask = skimage.transform.resize(self.binned_deep_mask, output_shape=np.shape(self.image),
                                                   preserve_range=True).astype(np.float32)
+        # set the z slice under min_slice and over max_slice to zero in deep_mask
+        print(self.image_shape)
+        if slice_range is None:
+            self.min_slice= 0
+            self.max_slice = self.image_shape[0]
+        else:
+            self.min_slice  = slice_range[0]
+            self.max_slice = slice_range[1]
+
+        self.deep_mask[:self.min_slice,:,:] = 0
+        self.deep_mask[self.max_slice:,:,:] = 0
 
         cryovesnet.save_label_to_mrc(self.deep_mask, self.deep_mask_path, template_path=self.image_path)
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
-    def label_vesicles_simply(self, input_array_name='deep_mask', threshold_coef=1.0, expanding=False,
-                              memkill=True):
+    def label_vesicles_simply(self, input_array_name='last_output_array_name', threshold_coef=1.0, expanding=False,
+                              convex=False, sperating =True,  memkill=True):
         # threshold_coef=0.986
 
         print("CryoVesNet Pipeline: running label_vesicles_simply")
+        if input_array_name == 'last_output_array_name':
+            input_array_name = self.last_output_array_name
+
         self.set_array('image')
-        self.set_array('deep_labels')
+        self.set_array('deep_mask')
         self.set_array(input_array_name)
-        # self.deep_mask = getattr(self, input_array_name)
-        # self.deep_mask = cryovesnet.crop_edges(self.deep_mask, radius=self.min_radius)
+
+        # if input_array_name == 'deep_mask':
+        #     self.deep_mask = getattr(self, input_array_name)
+        #     self.deep_mask = cryovesnet.crop_edges(self.deep_mask, radius=self.min_radius)
         # if within_segmentation_region:
         #     self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
-        #
-        opt_th, mean_shell_val = cryovesnet.my_threshold(self.image, self.deep_mask)
-        threshold = threshold_coef * opt_th
-        #
-        # deep_labels = skimage.morphology.label(self.deep_mask > threshold)
+        # #
+        if input_array_name== 'deep_mask':
+            self.deep_mask = getattr(self, input_array_name)
+            opt_th, mean_shell_val = cryovesnet.my_threshold(self.image, self.deep_mask, min_thr=0.8,max_thr=1, step=0.01)
+            self.deep_mask = cryovesnet.crop_edges(self.deep_mask, radius=self.min_radius)
 
-        deep_labels= self.deep_labels
-        ves_table2 = cryovesnet.vesicles_table(deep_labels)
+            threshold = threshold_coef * opt_th
+            self.threshold_tuned_labels = threshold
+            print(threshold)
+            #
+            deep_labels = skimage.morphology.label(self.deep_mask > threshold)
+            self.deep_labels = deep_labels.astype(np.uint16)
+            # deep_labels , _ = cryovesnet.find_threshold_per_vesicle_intensity(self.image, self.deep_labels , self.deep_mask, self.min_vol)
+        else:
+            deep_labels = self.deep_labels
+
+        # deep_labels= self.deep_labels
+        # ves_table2 = cryovesnet.vesicles_table(deep_labels)
         # deep_labels, small_labels = cryovesnet.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol,p=1, q=4, t=0.8)
 
 
-
-        ves_table = cryovesnet.vesicles_table(deep_labels)
-        deep_labels = cryovesnet.collision_solver(self.deep_mask, deep_labels, ves_table, threshold, delta_size=1)
+        if sperating:
+            ves_table = cryovesnet.vesicles_table(deep_labels)
+            deep_labels = cryovesnet.collision_solver(self.deep_mask, deep_labels, ves_table, self.threshold_tuned_labels , delta_size=1)
 
         if expanding:
-            deep_labels, small_labels = cryovesnet.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol, p=1, q=4, t=0.8)
+            deep_labels, small_labels = cryovesnet.expand_small_labels(self.deep_mask, deep_labels, self.threshold_tuned_labels, self.min_vol, p=1, q=4, t=0.8)
 
             if len(small_labels):
                 print(
@@ -338,11 +429,14 @@ class Pipeline():
                 print(small_labels)
                 deep_labels[np.isin(deep_labels, small_labels.index)] = 0
 
+        if convex==True:
+            deep_labels = cryovesnet.fast_pacman_killer(deep_labels)
+            # deep_labels = cryovesnet.pacman_killer(deep_labels)
 
-        # deep_labels = cryovesnet.pacman_killer(deep_labels)
         ves_table = cryovesnet.vesicles_table(deep_labels)
         deep_labels,badVesicles = cryovesnet.remove_outliers(deep_labels, ves_table, self.min_vol)
 
+        ves_table = cryovesnet.vesicles_table(deep_labels)
 
         self.clean_deep_labels = deep_labels.astype(np.uint16)
         cryovesnet.save_label_to_mrc(self.clean_deep_labels, self.clean_deep_labels_path, template_path=self.image_path)
@@ -351,10 +445,10 @@ class Pipeline():
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
-        return ves_table2,badVesicles
+        return ves_table,badVesicles
 
-    def label_vesicles(self, input_array_name='deep_mask', within_segmentation_region=True,
-                       memkill=True):
+    def label_vesicles(self, input_array_name='last_output_array_name', within_segmentation_region=True, threshold_coef=None,
+                       memkill=False):
         """label vesicles from the zoomed deep mask
         :param input_array_name: name of the array to be labelled
         :param within_bound: restrict labelling to segmentation_region? (currently called cytomask)
@@ -363,24 +457,32 @@ class Pipeline():
         :return:
         """
         print("CryoVesNet Pipeline: running label_vesicles")
+        if input_array_name == 'last_output_array_name':
+            input_array_name = self.last_output_array_name
+
         self.set_array('image')
         self.set_array(input_array_name)
         self.deep_mask = getattr(self, input_array_name)
         if within_segmentation_region:
             self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
-        opt_th, _ = segseg.find_threshold(self.image, self.deep_mask)
-        # opt_th = 0
-        # print("why - start")
+
+        if threshold_coef is None:
+            opt_th, _ = segseg.find_threshold(self.image, self.deep_mask,min_th=0.8)
+        else:
+            opt_th = threshold_coef
+        self.threshold_tuned_labels = opt_th
+        print("Threshold: ", opt_th)
+
         image_label_opt = skimage.morphology.label(self.deep_mask > opt_th)
         deep_labels = image_label_opt
         # _, deep_labels = segseg.mask_clean_up(image_label_opt)
         self.deep_labels = deep_labels.astype(np.uint16)
-        # print("why - end")
         cryovesnet.save_label_to_mrc(self.deep_labels, self.deep_labels_path, template_path=self.image_path)
         # free up memory
         self.last_output_array_name = 'deep_labels'
         if memkill:
-            self.clear_memory(exclude=[self.last_output_array_name, 'image'])
+            self.clear_memory(exclude=[self.last_output_array_name, 'image',
+                                  'threshold_tuned_labels','deep_mask'])
         self.print_output_info()
 
     def mask_loader(self):
@@ -458,11 +560,11 @@ class Pipeline():
             self.clear_memory(exclude=self.last_output_array_name)
         self.print_output_info()
 
-    def compute_sphere_dataframe(self, input_array_name='last_output_array_name'):
+    def compute_sphere_dataframe(self, input_array_name='last_output_array_name', tight=False,keep_elipsoid=False):
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        sphere_df, radials = cryovesnet.get_sphere_dataframe(self.image, getattr(self, input_array_name))
+        sphere_df, radials , elipsoid_label = cryovesnet.get_sphere_dataframe(self.image, getattr(self, input_array_name),margin=2, tight=tight,keep_elipsoid=keep_elipsoid)
         radials = np.array(radials)
         self.radials = radials
         mu = np.mean(radials, axis=0)
@@ -488,23 +590,38 @@ class Pipeline():
         # print(len(sphere_df))
         sphere_df.to_pickle(self.sphere_df_path)
         self.sphere_df = sphere_df
+        return sphere_df,elipsoid_label
 
-    def make_spheres(self, input_array_name='last_output_array_name', memkill=True):
+    def make_spheres(self, input_array_name='last_output_array_name', tight= False, keep_elipsoid = False ,memkill=True):
         print("CryoVesNet Pipeline: Making vesicles spherical.")
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        self.compute_sphere_dataframe(input_array_name)
+        _ , elipsoid_label = self.compute_sphere_dataframe(input_array_name, tight= tight,keep_elipsoid=keep_elipsoid)
         self.sphere_labels = cryovesnet.make_vesicle_from_sphere_dataframe(getattr(self, input_array_name), self.sphere_df)
+        if keep_elipsoid == True:
+            print("elipsoid_label",elipsoid_label)
+            # for on elipsoid_label and check where in the deep_labels is eqaul to the elipsoid_label and then put all these values in sphere_labels
+            temp= getattr(self, input_array_name)
+            self.sphere_labels = np.zeros_like(self.sphere_labels)
+            for e in elipsoid_label:
+                sphere_labels = np.where(temp == e, temp, self.sphere_labels).astype(np.uint16)
+                self.sphere_labels= sphere_labels
+
+
         cryovesnet.save_label_to_mrc(self.sphere_labels, self.sphere_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'sphere_labels'
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
+        return self.sphere_df
 
-    def repair_spheres(self, memkill=True, m=4, r=0):
-        self.set_array('cytomask')
-        self.set_array('sphere_labels')
+    def repair_spheres(self, input_array_name='last_output_array_name',  memkill=True, m=4, r=0):
+        print("CryoVesNet Pipeline: Repairing vesicles.")
+
+        if input_array_name == 'last_output_array_name':
+            input_array_name = self.last_output_array_name
+        self.set_array(input_array_name)
         # deep_labels = self.deep_labels.copy()
         sphere_labels = self.sphere_labels.copy()
         print(self.min_vol)
@@ -513,9 +630,14 @@ class Pipeline():
         sphere_df['radius'] = sphere_df['radius'] + r
         sphere_df = sphere_df[sphere_df['mahalanobis'] < m]
         sphere_labels = cryovesnet.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
+        try:
+            self.set_array('cytomask')
+            surround_labels = cryovesnet.surround_remover(sphere_labels, self.cytomask, self.min_vol)
+            sphere_df.drop(surround_labels)
+        except:
+            print("There is no cytomask file. Surrounding labels are not removed.")
 
-        surround_labels = cryovesnet.surround_remover(sphere_labels, self.cytomask, self.min_vol)
-        sphere_df.drop(surround_labels)
+
 
         temp = cryovesnet.adjacent_vesicles(sphere_df)
         edited = []
@@ -551,11 +673,16 @@ class Pipeline():
             edited = []
         print(temp)
 
+        sphere_df = sphere_df[sphere_df['radius'] > self.min_radius]
         # self.convex_labels = temp_best_corrected_labels
         self.convex_labels = cryovesnet.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
         print(len(sphere_df))
         cryovesnet.save_label_to_mrc(self.convex_labels, self.convex_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'convex_labels'
+        if memkill:
+            self.clear_memory(exclude=[self.last_output_array_name, 'image'])
+        self.print_output_info()
+
 
     def identify_spheres_outliers(self, bins=50, min_mahalanobis_distance=2.0):
         ax = self.sphere_df.mahalanobis.hist(bins=bins, color='blue')
@@ -569,14 +696,16 @@ class Pipeline():
         print(
             "You should inspect the labels that have a high mahalanobis distance as they are the likeliest to be wrongly segmented")
 
-    def fix_spheres_interactively(self, input_array_name='last_output_array_name', memkill=True):
+    def fix_spheres_interactively(self, input_array_name='last_output_array_name', max_expected_diameter=50 ,memkill=True):
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array('image')
         self.set_array(input_array_name)
-        visualization.add_points_remove_labels(self)
+        visualization.add_points_modify_labels(self,max_diameter=max_expected_diameter)
+        # visualization.add_points_remove_labels_v1(self)
         if memkill:
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
+
         self.print_output_info()
 
     def remove_small_labels(self, input_array_name='last_output_array_name', first_label=1, memkill=True):
@@ -761,6 +890,8 @@ class Pipeline():
         self.set_array("convex_labels")
 
         # corrected_labels = self.sphere_labels.copy()
+        # corrected_labels = self.convex_labels.copy()
+        # corrected_labels = self.deep_mask.copy()
         corrected_labels = self.convex_labels.copy()
         # self.set_array("sphere_labels")
         # if input_array_name == 'last_output_array_name':
@@ -818,5 +949,35 @@ class Pipeline():
         #     a2 = cryovesnet.objectwise_evalution(corrected_labels, reff, proportion=ppp)
         #     a += a1
         #     a += a2
-        # self.clear_memory()
+        a += cryovesnet.new_objectwise_evalution(reff, corrected_labels)
+        # for prediction in [self.deep_labels, self.clean_deep_labels, self.sphere_labels, self.convex_labels]:
+        #     a += cryovesnet.new_objectwise_evalution(reff, prediction)
+
+        # #binarize reff and corrected_labels
+        # reff = (reff >= 1).astype(int)
+        # # corrected_labels = (corrected_labels >= 1).astype(int)
+        # true_labels = reff.flatten()
+        #
+        # predicted_probs = self.deep_mask.copy().flatten()
+        # #
+        # # Calculate ROC curve
+        # fpr, tpr, thresholds = roc_curve(true_labels, predicted_probs)
+        #
+        # # Calculate AUC
+        # roc_auc = auc(fpr, tpr)
+        # # Plot ROC curve
+        # plt.figure()
+        # plt.plot(fpr, tpr, color='darkorange', lw=2, label='ROC curve (area = %0.2f)' % roc_auc)
+        # plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+        # plt.xlim([0.0, 1.0])
+        # plt.ylim([0.0, 1.05])
+        # plt.xlabel('False Positive Rate')
+        # plt.ylabel('True Positive Rate')
+        # plt.title('Receiver Operating Characteristic')
+        # plt.legend(loc="lower right")
+        # # plt.savefig('roc_curve.png')
+        # plt.show()
+
+        self.clear_memory()
+        # return a,true_labels,predicted_probs
         return a

@@ -6,6 +6,7 @@ from tqdm import tqdm, trange
 import skimage.io
 import mrcfile
 import tensorflow as tf
+from scipy.ndimage import zoom,rotate
 
 try:
     from tensorflow.keras import backend as K
@@ -43,6 +44,79 @@ def train_generator(folder, numtot, batchsize):
 
         im_batch = (im_batch - np.mean(im_batch)) / np.std(im_batch)
         yield (np.array(im_batch).astype(np.float32), np.array(mask_batch).astype(np.float32))
+
+
+def random_crop_and_resize(image, mask, original_size):
+    min_crop_size = (16, 16, 16)
+    max_crop_size = (32, 32, 32)
+
+    # Decide randomly whether to crop
+    if np.random.rand() > 0.5:
+        # Randomly choose the crop size within the specified range
+        crop_size = (
+            np.random.randint(min_crop_size[0], max_crop_size[0] + 1),
+            np.random.randint(min_crop_size[1], max_crop_size[1] + 1),
+            np.random.randint(min_crop_size[2], max_crop_size[2] + 1)
+        )
+
+        # Randomly choose the start points for the crop
+        start_x = np.random.randint(0, image.shape[0] - crop_size[0] + 1)
+        start_y = np.random.randint(0, image.shape[1] - crop_size[1] + 1)
+        start_z = np.random.randint(0, image.shape[2] - crop_size[2] + 1)
+
+        # Crop the image and mask
+        cropped_image = image[start_x:start_x + crop_size[0], start_y:start_y + crop_size[1],
+                        start_z:start_z + crop_size[2]]
+        cropped_mask = mask[start_x:start_x + crop_size[0], start_y:start_y + crop_size[1],
+                       start_z:start_z + crop_size[2]]
+
+        # Resize the cropped image and mask to the original size
+        resized_image = zoom(cropped_image, (
+        original_size[0] / crop_size[0], original_size[1] / crop_size[1], original_size[2] / crop_size[2]), order=1)
+        resized_mask = zoom(cropped_mask, (
+        original_size[0] / crop_size[0], original_size[1] / crop_size[1], original_size[2] / crop_size[2]), order=0)
+    else:
+        # No cropping, use the original image
+        resized_image = image
+        resized_mask = mask
+
+    # Random augmentation (optional)
+    # if np.random.rand() > 0.5:
+    #     angle = np.random.uniform(-10, 10)
+    #     resized_image = rotate(resized_image, angle, axes=(1, 2), reshape=False)
+    #     resized_mask = rotate(resized_mask, angle, axes=(1, 2), reshape=False)
+    #
+    # if np.random.rand() > 0.5:
+    #     resized_image = np.flip(resized_image, axis=0)
+    #     resized_mask = np.flip(resized_mask, axis=0)
+
+    return resized_image, resized_mask
+
+
+def new_train_generator(folder, numtot, batchsize):
+    rand_arr = np.random.choice(numtot, size=numtot, replace=False)
+    num = 0
+    while True:
+        im_batch = []
+        mask_batch = []
+        for _ in range(batchsize):
+            image = np.load(folder + f'/image_{rand_arr[num]}.npy')
+            mask = np.load(folder + f'/mask_{rand_arr[num]}.npy')
+            original_size = image.shape[:3]
+            image, mask = random_crop_and_resize(image, mask, original_size)
+            im_batch.append(image[:, :, :, np.newaxis])
+            mask_batch.append(mask[:, :, :, np.newaxis])
+            num += 1
+            if num == numtot:
+                num = 0
+                rand_arr = np.random.choice(numtot, size=numtot, replace=False)
+
+        im_batch = np.array(im_batch)
+        mask_batch = np.array(mask_batch)
+
+        im_batch = (im_batch - np.mean(im_batch)) / np.std(im_batch)
+
+        yield im_batch.astype(np.float32), mask_batch.astype(np.float32)
 
 
 def generator_2d(folder, subset_size, batch_size, start_index=0):
@@ -298,29 +372,29 @@ def run_training(network, save_folder, folder, numtot, batchsize, numvalid, is_3
 #                           use_multiprocessing=False, workers=1)
 
 
-def run_training_multiGPU(save_folder, data_folder, num_total, batch_size, num_valid, window_size=64):
+def run_training_multiGPU(save_folder, data_folder, num_total, batch_size, num_valid, dropout = 0.0, window_size=64):
     # Create a MirroredStrategy.
     strategy = tf.distribute.MirroredStrategy()
     print('Number of devices: {}'.format(strategy.num_replicas_in_sync))
     data_name = data_folder.split('/')[-1]
     if data_name == '':
         data_name = data_folder.split('/')[-2]
-    logdir = os.path.join(save_folder, f'{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}_{data_name}_{window_size}')
+    logdir = os.path.join(save_folder, f'{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}_{data_name}_{dropout}_{window_size}')
     os.makedirs(logdir, exist_ok=True)
     with open(logdir + '/arguments.json', 'w') as f:
         json.dump({'save_folder': save_folder, 'folder': data_folder, 'numtot': num_total,
-                   'batchsize': batch_size, 'numvalid': num_valid}, f)
+                   'batchsize': batch_size, 'dropout': dropout,'numvalid': num_valid}, f)
     csv_logger = tf.keras.callbacks.CSVLogger(os.path.join(logdir, 'log.csv'), append=True, separator=';')
     tensorboard_callback = tf.keras.callbacks.TensorBoard(logdir, histogram_freq=1)
     with strategy.scope():
         # Create and compile the model within the strategy scope
         network = create_unet_3d(inputsize=(window_size, window_size, window_size, 1),
-                                 n_depth=2 if window_size == 64 else 2,
-                                 n_filter_base=window_size // 4,
+                                 n_depth=3 if window_size == 64 else 2,
+                                 n_filter_base=window_size // 2,
                                  kernel_size=(3, 3, 3),
                                  activation='relu',
                                  batch_norm=True,
-                                 dropout=0.0,
+                                 dropout=dropout,
                                  n_conv_per_depth=2,
                                  pool_size=(2, 2, 2),
                                  n_channel_out=1)
@@ -333,7 +407,7 @@ def run_training_multiGPU(save_folder, data_folder, num_total, batch_size, num_v
         model_checkpoint_loss = ModelCheckpoint(
             logdir + '/weights_best_loss.h5',
             monitor='val_loss', mode='min', save_best_only=True)
-        # earlystopping = EarlyStopping(monitor="val_dice_coef", min_delta=0, patience=50, verbose=1, mode="max",
+        # earlystopping = EarlyStopping(monitor="val_dice_coef", min_delta=0, patience=15, verbose=1, mode="max",
         #                               restore_best_weights=True)
 
         # Convert generators to tf.data.Dataset
@@ -350,7 +424,7 @@ def run_training_multiGPU(save_folder, data_folder, num_total, batch_size, num_v
                 [batch_size, window_size, window_size, window_size, 1]))
 
         # Train the model
-        network.fit(train_data, epochs=200, steps_per_epoch=np.floor(num_total / batch_size),
+        network.fit(train_data, epochs=1000, steps_per_epoch=np.floor(num_total / batch_size),
                     validation_data=valid_data, validation_steps=np.floor(num_valid / batch_size),
                     callbacks=[model_checkpoint_dice, model_checkpoint_loss, csv_logger, tensorboard_callback])
 
@@ -402,7 +476,7 @@ def run_training_multiGPU_2d(save_folder, data_folder, num_total, batch_size, nu
                 [batch_size, window_size, window_size, 1]))
 
         # Train the model
-        network.fit(train_data, epochs=1000, steps_per_epoch=np.floor(num_total / batch_size),
+        network.fit(train_data, epochs=200, steps_per_epoch=np.floor(num_total / batch_size),
                     validation_data=valid_data, validation_steps=np.floor(num_valid / batch_size),
                     callbacks=[model_checkpoint_dice, model_checkpoint_loss, csv_logger, tensorboard_callback])
 
@@ -442,6 +516,48 @@ def run_segmentation(image, unet3d,roi=24):
                     = test_im[to_pad:to_pad + roi, to_pad:to_pad + roi, to_pad:to_pad + roi]
     image_mask = image_mask[0:image_mask.shape[0] - to_pad0[0], 0:image_mask.shape[1] - to_pad0[1],
                  0:image_mask.shape[2] - to_pad0[2]]
+    # K.clear_session()
+    return image_mask
+
+def run_segmentation_new(image, unet3d,roi=24):
+    # region of interest. Middle image region kept after segmentation
+    # the network input needs to be larger than this (e.g. 64) to avoid
+    # tiling effects
+
+    network_size = unet3d.input.get_shape().as_list()[1]
+    # roi = 24
+    print("ROI: ", roi)
+    wsize = network_size
+    to_pad0 = roi - (np.array(image.shape) % roi)
+    to_pad = int((wsize - roi) / 2)
+
+    # pad image to avoid edge effects
+    image_pd = np.pad(image, [[0, x] for x in roi - (np.array(image.shape) % roi)], mode='constant', constant_values=0)
+    ideal_size = np.array(image_pd.shape)
+    image_pd = np.pad(image_pd, to_pad, mode='constant', constant_values=0)
+
+    # run the segmentation by tiling the image
+    image_mask = np.zeros(ideal_size)
+    numit = 0
+    for i in tqdm(range(0, image.shape[0], roi)):
+        # print(i)
+        for j in range(0, image.shape[1], roi):
+            # print(j)
+            for k in range(0, image.shape[2], roi):
+                # print(k)
+                numit += 1
+                test = unet3d.predict(image_pd[i:i + wsize, j:j + wsize, k:k + wsize][np.newaxis, :, :, :, np.newaxis])
+                test_im = test[0, :, :, :, 0]
+                image_mask[i:i + roi, j:j + roi, k:k + roi] \
+                    = test_im[to_pad:to_pad + roi, to_pad:to_pad + roi, to_pad:to_pad + roi]
+
+                test = unet3d.predict(image_pd[i:i + wsize, j:j + wsize, k:k + wsize][np.newaxis, :, :, :, np.newaxis])
+                test_im = test[0, :, :, :, 0]
+                image_mask[i:i + roi, j:j + roi, k:k + roi] \
+                    = test_im[to_pad:to_pad + roi, to_pad:to_pad + roi, to_pad:to_pad + roi]
+
+    image_mask = image_mask[0:image_mask.shape[0] - to_pad0[0], 0:image_mask.shape[1] - to_pad0[1],
+                 0:image_mask.shape[2] - to_pad0[2]]
     K.clear_session()
     return image_mask
 
@@ -454,7 +570,7 @@ def gaussian_kernel_3d(kernel_size, sigma=1.0):
     return kernel / np.sum(kernel)
 
 
-def run_segmentation_overlap(image, unet3d, roi=24, use_kernel=True, batch_size=1):
+def run_segmentation_overlap_old(image, unet3d, roi=24, use_kernel=True, batch_size=1):
     # region of interest. Middle image region kept after segmentation
     # the network input needs to be larger than this (e.g. 64) to avoid
     # tiling effects
@@ -462,7 +578,7 @@ def run_segmentation_overlap(image, unet3d, roi=24, use_kernel=True, batch_size=
     wsize = network_size
     to_pad = int((wsize - roi) / 2)
     input_shape = image.shape
-
+    print(image.shape)
     # pad image to avoid edge effects
     image_pd = np.pad(image, [[0, x] for x in roi - (np.array(image.shape) % roi)], mode='constant', constant_values=0)
     image_pd = np.pad(image_pd, to_pad, mode='constant', constant_values=0)
@@ -502,7 +618,7 @@ def run_segmentation_overlap(image, unet3d, roi=24, use_kernel=True, batch_size=
     return mask_pd / segmentation_weight
 
 
-def run_segmentation_2d(image, unet_2d, roi=64):
+def run_segmentation_2d(image, unet_2d, roi=48):
     # region of interest. Middle image region kept after segmentation
     # the network input needs to be larger than this (e.g., network size) to avoid tiling effects
     network_size = unet_2d.input.get_shape().as_list()[1]

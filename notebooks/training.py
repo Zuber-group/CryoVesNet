@@ -4,7 +4,7 @@ import os
 warnings.filterwarnings("ignore")
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 # Here you can choose which GPU to use
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,2"
+os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 import tensorflow as tf
 import cryovesnet
@@ -32,14 +32,23 @@ if gpus:
 # specifiy path to training data and to folder where to save training weights
 
 
-save_folder = '/mnt/data/Amin/Data/training_logs/'
+save_folder = '/mnt/data/Amin/Data_latest/training_logs/'
 
 # specify number of training data, validation data, batch size
+
 # window_size = 32
-# numtot = 900
-# numvalid = 200
-# batchsize = 50
-# folder = '/mnt/data/Amin/Data/train_dataset_32_synaptasome'
+# numtot = 1100
+# numvalid = 100
+# batchsize = 48
+# folder = '/mnt/data/Amin/Data/train_dataset_32_synaptasome_1024'
+
+#
+window_size = 32
+numtot = 900
+numvalid = 200
+batchsize = 200
+folder = '/mnt/data/Amin/Data_latest/train_dataset_32_synaptasome'
+
 
 ## CryoVesNet Training ##
 #
@@ -49,26 +58,54 @@ save_folder = '/mnt/data/Amin/Data/training_logs/'
 # batchsize = 25  # 2 gpus
 # folder = '/mnt/data/Amin/Data/train_dataset_64_raw_neuron'
 #
-window_size = 64
-numtot = 144
-numvalid = 40
-batchsize = 25
-folder = '/mnt/data/Amin/Data/train_dataset_64_synaptasome_8000'
-
-
+# window_size = 64
+# numtot = 229
+# numvalid = 24
+# batchsize = 24
+# folder = '/mnt/data/Amin/Data/train_dataset_64_synaptasome_4096'
+# #
+# #
 umic.run_training_multiGPU(save_folder=save_folder, data_folder=folder, num_total=numtot, batch_size=batchsize,
-                           num_valid=numvalid, window_size=window_size)
+                           num_valid=numvalid, dropout=0.0 , window_size=window_size)
 
-
-
-# folder = '/media/amin/mtwo/train_dataset_2d_128_synaptasome_1000/'
-# save_folder = '/media/amin/mtwo/train2d/'
 #
-# #specify number of training data, validation data, batch size
-# numtot = 4062
-# numvalid = 475
-# batchsize = 50
-# network_name= "resnet"
+
+# folder = '/mnt/data/Amin/Data_latest/train_dataset_3axes_2d_128_synaptasome_500'
+# # save_folder = '/media/amin/mtwo/train2d/'
+# #
+# # #specify number of training data, validation data, batch size
+# numtot = 6844
+# numvalid = 728
+# batchsize = 48
+# network_name= "unet"
 #
 # umic.run_training_multiGPU_2d(save_folder = save_folder, data_folder = folder,
 #                               num_total = numtot,batch_size = batchsize, num_valid = numvalid,network_name=network_name)
+#
+# #
+# folder = '/mnt/data/Amin/Data_latest/train_dataset_1axes_2d_128_synaptasome_500'
+# # save_folder = '/media/amin/mtwo/train2d/'
+# # 2633 6844
+# # #specify number of training data, validation data, batch size
+# numtot = 2633
+# numvalid = 728
+# batchsize = 48
+# network_name= "eman2"
+#
+# umic.run_training_multiGPU_2d(save_folder = save_folder, data_folder = folder,
+#                               num_total = numtot,batch_size = batchsize, num_valid = numvalid,network_name=network_name)
+#
+
+
+#
+# folder = '/mnt/data/Amin/Data_latest/train_dataset_1axes_2d_64_synaptasome_128'
+# # save_folder = '/media/amin/mtwo/train2d/'
+# # 2633 6844
+# # #specify number of training data, validation data, batch size
+# numtot = 7859
+# numvalid = 2019
+# batchsize = 25
+# network_name= "eman2"
+#
+# umic.run_training_multiGPU_2d(save_folder = save_folder, data_folder = folder,
+#                               num_total = numtot,batch_size = batchsize, num_valid = numvalid,window_size=64 , network_name=network_name)
