@@ -12,7 +12,7 @@ setup(
     package_data={'': ['weights/weights.h5']},
     include_package_data=True,
     install_requires=['numpy', 'scikit-image', 'scipy', 'jupyter','jupyterlab',
-                      'pandas', 'h5py', 'tifffile','mrcfile','tqdm', 'napari[pyqt5]','pydantic<2',
+                      'pandas', 'h5py', 'tifffile','mrcfile','tqdm', 'napari[pyqt5]',
                       'napari-mrcfile-reader','keras==2.9.0','tensorflow<2.10'],
 
 )

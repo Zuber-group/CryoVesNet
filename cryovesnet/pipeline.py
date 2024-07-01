@@ -27,8 +27,6 @@ from scipy.stats import chi2, pearsonr, spearmanr
 from collections.abc import Iterable
 import subprocess
 import shutil
-from sklearn.metrics import roc_curve, auc
-import matplotlib.pyplot as plt
 
 try:
     import tensorflow.compat.v1 as tf
@@ -167,6 +165,7 @@ class Pipeline():
     def set_segmentation_region_from_mod(self, datatype=np.uint8, force_generate=True):
         if (not self.cytomask_path.exists()) or force_generate:
             cmd = f"imodmop -mode 6 -o 1 -mask 1 \"{self.cell_outline_mod_path}\" \"{self.image_path}\" \"{self.cytomask_path}\""
+            # print(cmd)
             os.system(cmd)
         self.set_array('cytomask', datatype=datatype)
 

@@ -4,7 +4,6 @@ import warnings
 import os
 import glob
 import numpy as np
-from sklearn.metrics import roc_curve, auc
 import matplotlib.pyplot as plt
 import shutil
 
