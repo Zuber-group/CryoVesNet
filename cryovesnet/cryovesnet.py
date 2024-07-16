@@ -513,8 +513,10 @@ def get_sphere_dataframe(image, image_label, margin=5,tight=False,keep_elipsoid=
         label = labels[i]
         radius = get_label_largest_radius(bboxes[i])  # this is an integer
         rounded_centroid = np.round(centroids[i]).astype(np.int16)  # this is an array of integers
-        eccentricity= vesicle_regions['axis_major_length'][i]/vesicle_regions['axis_minor_length'][i]
-        if not keep_elipsoid or eccentricity < 1.2:
+        # eccentricity= vesicle_regions['axis_major_length'][i]/vesicle_regions['axis_minor_length'][i]
+        eccentricity = math.sqrt(
+            1 - (vesicle_regions['axis_minor_length'][i] / vesicle_regions['axis_major_length'][i]) ** 2)
+        if not keep_elipsoid or eccentricity <= 0.48:
             density, keep_label, new_centroid, new_radius, thickness, radial = get_sphere_parameters(image, label, margin, radius,
                                                                                              rounded_centroid,tight=tight)
 
@@ -531,7 +533,7 @@ def get_sphere_dataframe(image, image_label, margin=5,tight=False,keep_elipsoid=
             radius = get_label_largest_radius(bboxes[i])  # this is an integer
             rounded_centroid = np.round(centroids[i]).astype(np.int16)  # this is an array of integers
             eccentricity = math.sqrt(1 - (vesicle_regions['axis_minor_length'][i] / vesicle_regions['axis_major_length'][i]) ** 2)
-            if eccentricity > 0.5 and eccentricity < 0.95:
+            if eccentricity > 0.48 and eccentricity < 0.95:
                 density, keep_label, new_centroid, new_radius, thickness, radial = get_sphere_parameters(image, label,
                                                                                                      2, radius,
                                                                                                      rounded_centroid,max_cycles=1,
@@ -722,7 +724,7 @@ def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1
 
                     old_label[px + collision_ves['bbox-0'][i[0]] - delta_size,
                               py + collision_ves['bbox-1'][i[0]] - delta_size,
-                              pz + collision_ves['bbox-2'][i[0]] - delta_size] = collision_ves['bbox-0'][i[0]] + 1000
+                              pz + collision_ves['bbox-2'][i[0]] - delta_size] = collision_ves['label'][i[0]] + 1000
                     break
             base_thr = 1-step
             step = step/10
