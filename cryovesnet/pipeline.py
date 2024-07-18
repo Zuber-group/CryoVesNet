@@ -416,7 +416,7 @@ class Pipeline():
 
         if sperating:
             ves_table = cryovesnet.vesicles_table(deep_labels)
-            deep_labels = cryovesnet.collision_solver(self.deep_mask, deep_labels, ves_table, self.threshold_tuned_labels , delta_size=1)
+            deep_labels = cryovesnet.collision_solver(self.deep_mask, deep_labels, ves_table, self.threshold_tuned_labels , delta_size=10)
 
         if expanding:
             deep_labels, small_labels = cryovesnet.expand_small_labels(self.deep_mask, deep_labels, self.threshold_tuned_labels, self.min_vol, p=1, q=4, t=0.8)
@@ -472,7 +472,7 @@ class Pipeline():
         self.threshold_tuned_labels = opt_th
         print("Threshold: ", opt_th)
 
-        image_label_opt = skimage.morphology.label(self.deep_mask > opt_th)
+        image_label_opt = skimage.morphology.label(self.deep_mask > opt_th,connectivity=1)
         deep_labels = image_label_opt
         # _, deep_labels = segseg.mask_clean_up(image_label_opt)
         self.deep_labels = deep_labels.astype(np.uint16)

@@ -674,7 +674,7 @@ def vesicles_table(labels):
     print("Tabel computed!")
     return ves_tabel
 
-def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1):
+def collision_solver_debug(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1):
     '''We assume that the have low extent value and high area_zscore are colliding vesicles
     Later on we goes back to mask and search for finer threshold to separate them'''
 
@@ -703,6 +703,7 @@ def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1
         is_break = 0
         base_thr = thr
         step = 0.01
+
         while not is_break:
             for th in np.arange(base_thr, 1, step):
                 # temp=sub_old_label_mask>th
@@ -711,7 +712,10 @@ def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1
                 if nc > pre_nc:
                     is_break = 1
                     # print(pre_nc, nc)
-                    px, py, pz = np.where(labels > 0)
+                    if collision_ves['label'][i[0]] == 274:
+                        print(np.shape(sub_old_mask), np.shape(sub_old_label),np.shape(temp))
+                        print(i,th)
+                    px, py, pz = np.where(temp > 0)
 
                     pxq, pyq, pzq = np.where(~sub_old_label_mask)
 
@@ -741,6 +745,77 @@ def collision_solver(deep_mask, deep_labels,ves_table, threshold ,delta_size = 1
     old_label = old_label.astype(np.uint16)
 
     return old_label
+
+
+def collision_solver(deep_mask, deep_labels, ves_table, threshold, delta_size=1):
+    EXTENT_THRESHOLD = 0.5
+    AREA_ZSCORE_THRESHOLD = 1
+    LABEL_OFFSET = 1000
+    DEBUG_LABEL = 274
+
+    collision_ves = ves_table[
+        (ves_table['extent'] < EXTENT_THRESHOLD) & (ves_table['area_zscore'] > AREA_ZSCORE_THRESHOLD)]
+    print(collision_ves)
+
+    old_mask = deep_mask.copy()
+    old_label = deep_labels.copy()
+
+    for idx, ves in collision_ves.iterrows():
+        bbox = ves[['bbox-0', 'bbox-1', 'bbox-2', 'bbox-3', 'bbox-4', 'bbox-5']].values
+        sub_slice = tuple(slice(int(bbox[i] - delta_size), int(bbox[i + 3] + delta_size + 1)) for i in range(3))
+
+        sub_old_mask = old_mask[sub_slice[0], sub_slice[1], sub_slice[2]]
+        sub_old_label = old_label[sub_slice[0], sub_slice[1], sub_slice[2]]
+
+        # Create a mask for the current vesicle
+        vesicle_mask = sub_old_label == ves['label']
+
+        thr = threshold
+        temp_mask = sub_old_mask > thr
+        temp_mask[~vesicle_mask] = False  # Only consider the area of the current vesicle
+        ttt, pre_nc = skimage.morphology.label(temp_mask, return_num=True, connectivity=None)
+
+        base_thr = thr
+        step = 0.01
+
+        while step >= 0.0001:
+            for th in np.arange(base_thr, 1, step):
+                temp = sub_old_mask > th
+                temp[~vesicle_mask] = False  # Only consider the area of the current vesicle
+                nc = skimage.morphology.label(temp, return_num=True, connectivity=None)[1]
+                if nc > pre_nc:
+                    # Set the edges of sub_old_label to LABEL_OFFSET for visualization
+                    # sub_old_label[0, :, :] = LABEL_OFFSET
+                    # sub_old_label[-1, :, :] = LABEL_OFFSET
+                    # sub_old_label[:, 0, :] = LABEL_OFFSET
+                    # sub_old_label[:, -1, :] = LABEL_OFFSET
+                    # sub_old_label[:, :, 0] = LABEL_OFFSET
+                    # sub_old_label[:, :, -1] = LABEL_OFFSET
+
+                    old_label_slice = old_label[sub_slice[0], sub_slice[1], sub_slice[2]]
+
+                    # Only clear the area of the current vesicle
+                    old_label_slice[vesicle_mask] = 0
+
+                    # Create new labels
+                    new_labels = skimage.morphology.label(temp, connectivity=1)
+
+                    # Update only within the current vesicle area
+                    update_mask = (new_labels > 0) & vesicle_mask
+                    old_label_slice[update_mask] = new_labels[update_mask] + LABEL_OFFSET + ves['label']
+
+                    # Update the main old_label array
+                    old_label[sub_slice[0], sub_slice[1], sub_slice[2]] = old_label_slice
+
+                    break
+            else:
+                base_thr = 1 - step
+                step /= 10
+                continue
+            break
+
+    return old_label.astype(np.uint16)
+
 
 
 def add_sphere_labels_under_points(image, image_labels, points_to_add,
