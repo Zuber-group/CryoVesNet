@@ -29,7 +29,7 @@ This package has been developed Ubuntu 20.04.3 LTS, However, it has been tested 
 ## Using the pre-trained model to segment cytoplasmic vesicles
 To create the cytomask, you need to place the cell_outline.mod file in the same directory as the tomogram.
 You use the same script to build your pipeline, in case you are interested in all vesicles in tomograms you can set  in all vesicles within_segmentation_region = False.
-We used object object-orientated approach to build the pipeline. You can use the following [script](notebooks/single_dataset.py) to build your pipeline and run different steps of the pipeline.
+We used object object-orientated approach to build the pipeline. You can use the following [script](notebooks/single_dataset_pathlib.py) to build your pipeline and run different steps of the pipeline.
 
 In step 5 regarding using the pretrain network you need to set up the rescale factor proportional to the training dataset pixel size which is 22.40 Angstrom.
 The steps are briefly explained as follows:
@@ -66,7 +66,7 @@ You cn set level of test time data augmentation by setting value of the augmenta
 <pre>pl.rescale(force_run=True,slice_range=None)
 </pre>
 > You can set slice_range to clean the mask in a specific Z range, for example, to clean top and bottom of the mask you can set  you can set of the slice_range = (50,150)
-> The signature of the zoom method is as follows:<pre> zoom(force_run=False, slice_range=None) </pre>
+> The signature of the rescale method is as follows:<pre> rescale(force_run=False, slice_range=None) </pre>
 7. Generate primary labels if you do not have cell_outline.mod file in the same directory as the tomogram you can set within_segmentation_region = False
 <pre>
 pl.label_vesicles(within_segmentation_region = True,)
@@ -81,7 +81,7 @@ pl.label_vesicles_adaptive(separating =True)
 </pre>
 > Adaptive thresholding is used to separate the vesicles closely packed together, and expanding the small vesicles.
 > There are 3 main arguments in the label_vesicles_adaptive method, namely separating, expanding, and convex. The default values are False.
-> "When not specified otherwise, run_deep accepts these default parameters:
+> "When not specified otherwise, label_vesicles_adaptive accepts these default parameters:
 > <pre>label_vesicles_adaptive(expanding=False,convex=False, separating =False,  memkill=True)</pre>
 9. Refinement using the radial profile
 <pre>
@@ -95,8 +95,8 @@ pl.make_spheres()
 pl.repair_spheres()
 </pre>
 > The repair_spheres method has the following signature:
-> <pre>repair_spheres( p=0.3, m=4, r=0, memkill=True)/pre>
-> which you can set the "m" as mahalonobis distance threshold and p as p-value threshold. The "r"" will add the radius of the vesicle. 
+> <pre>repair_spheres( p=0.3, m=4, memkill=True)/pre>
+> which you can set the "m" as mahalonobis distance threshold and p as p-value threshold, to remove outlier. 
 11. This step ensures that the mod file is compatible with the pyto software
 <pre>
 pl.make_full_modfile(input_array_name='convex_labels')
@@ -166,8 +166,8 @@ pl = cryovesnet.Pipeline(dataset_directory,pattern="*.rec.nad")
 pl.setup_cryovesnet_dir(make_masks= False, initialize=False)
 pl.fix_spheres_interactively()
 </pre>
-## Efficiently running the pipeline
-The runtime of pipeline for a tomogram with pixel size 14.69, without making the mod file is around 200 second on a single GPU.
+##  Runtime efficiency of the pipeline
+The runtime of pipeline for a tomogram with pixel size 14.69, without making the mod file is around 200 second on a single GPU. (~ A4000 Nvidia GPU).
 Almost 20-30 pecent of the time is spent on running the pre-trained network. In the figure bellow, the runtime of the pipeline is shown. (with mod file generation)
 ![Pipeline](images/efficiency.png)
 ## Train and create your own dataset
