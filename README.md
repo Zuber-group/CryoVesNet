@@ -167,7 +167,7 @@ pl.setup_cryovesnet_dir(make_masks= False, initialize=False)
 pl.fix_spheres_interactively()
 </pre>
 ##  Runtime efficiency of the pipeline
-The runtime of pipeline for a tomogram with pixel size 14.69, without making the mod file is around 200 second on a single GPU. (~ A4000 Nvidia GPU).
+The runtime of pipeline for a tomogram with pixel size 14.69, without making the mod file is around 200 second on a single GPU (~ A4000 Nvidia GPU).
 Almost 20-30 pecent of the time is spent on running the pre-trained network. In the figure bellow, the runtime of the pipeline is shown. (with mod file generation)
 ![Pipeline](images/efficiency.png)
 ## Train and create your own dataset
