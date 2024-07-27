@@ -40,7 +40,7 @@ pl2.run_deep(force_run=False, gauss=False, rescale= None, augmentation_level=4, 
 pl2.zoom(force_run=False,slice_range=None)
 pl2.label_vesicles(input_array_name="deep_mask", within_segmentation_region=False,threshold_coef=None)
 pl2.label_vesicles_simply( expanding = False,convex=True,sperating=True)
-df = pl2.make_spheres(tight=True, keep_elipsoid=True)
+df = pl2.make_spheres(tight=True, keep_elllipsoid=True)
 pl2.repair_spheres(m=4)
 # # # pl2.make_full_modfile(input_array_name='convex_labels')
 # # # pl2.make_full_label_file()

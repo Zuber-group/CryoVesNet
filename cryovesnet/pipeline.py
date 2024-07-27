@@ -93,6 +93,7 @@ class Pipeline():
         self.clean_deep_labels_path = self.save_dir / (self.image_path.stem + '_clean_deep_labels.mrc')
         self.threshold_tuned_labels_path = self.save_dir / (self.image_path.stem + '_intensity_corrected_labels.mrc')
         self.convex_labels_path = self.save_dir / (self.image_path.stem + '_convex_labels.mrc')
+        self.ellipsoid_labels_path = self.save_dir / (self.image_path.stem + '_ellipsoid_labels.mrc')
         self.mancorr_labels_path = self.save_dir / (self.image_path.stem + '_mancorr.mrc')
         self.sphere_labels_path = self.save_dir / (self.image_path.stem + '_sphere.mrc')
         self.sphere_df_path = self.save_dir / (self.image_path.stem + '_sphere_dataframe.pkl')
@@ -111,6 +112,7 @@ class Pipeline():
         self.clean_deep_labels = None
         self.deep_labels = None  # placeholder for cleaned label array
         self.threshold_tuned_labels = None  # placeholder for threshold tuned label array
+        self.ellipsoid_labels = None
         self.convex_labels = None
         self.mancorr_labels = None
         self.sphere_labels = None
@@ -118,7 +120,7 @@ class Pipeline():
         self.final_vesicle_labels = None
         self.full_labels = None
         self.garbage_collector = {'image', 'binned_deep_mask', 'deep_mask', 'cytomask',
-                                  'active_zone_mask', 'deep_labels','clean_deep_labels',
+                                  'active_zone_mask', 'deep_labels','clean_deep_labels', 'ellipsoid_labels',
                                   'threshold_tuned_labels', 'convex_labels', 'mancorr_labels', 'sphere_labels',
                                   'no_small_labels', 'final_vesicle_labels'}
         self.vesicle_mod_path = self.save_dir / 'vesicles.mod'
@@ -162,7 +164,7 @@ class Pipeline():
             setattr(self, array_name, getattr(self, array_name).astype(datatype))
         return array_name
 
-    def set_segmentation_region_from_mod(self, datatype=np.uint8, force_generate=True):
+    def set_segmentation_region_from_mod(self, datatype=np.uint8, force_generate=False):
         if (not self.cytomask_path.exists()) or force_generate:
             cmd = f"imodmop -mode 6 -o 1 -mask 1 \"{self.cell_outline_mod_path}\" \"{self.image_path}\" \"{self.cytomask_path}\""
             # print(cmd)
@@ -338,8 +340,17 @@ class Pipeline():
             self.last_output_array_name = "deep_labels"
         print(self.save_dir)
         if make_masks:
-            self.set_segmentation_region_from_mod()
-            # self.set_active_zone_array_from_mod()
+            #chech if the cell_outline_mod_path exists
+            if not self.cell_outline_mod_path.exists():
+                raise ValueError("cell_outline_mod_path does not exist")
+            else:
+                self.set_segmentation_region_from_mod()
+            #check if the active_zone_mod_path exists
+            if not self.active_zone_mod_path.exists():
+                raise ValueError("active_zone_mod_path does not exist")
+            else:
+                self.set_active_zone_array_from_mod()
+            self.set_active_zone_array_from_mod()
         if memkill:
             self.clear_memory()
 
@@ -370,6 +381,8 @@ class Pipeline():
 
         self.deep_mask[:self.min_slice,:,:] = 0
         self.deep_mask[self.max_slice:,:,:] = 0
+
+
 
         cryovesnet.save_label_to_mrc(self.deep_mask, self.deep_mask_path, template_path=self.image_path)
         if memkill:
@@ -559,11 +572,11 @@ class Pipeline():
             self.clear_memory(exclude=self.last_output_array_name)
         self.print_output_info()
 
-    def compute_sphere_dataframe(self, input_array_name='last_output_array_name', tight=False,keep_elipsoid=False):
+    def compute_sphere_dataframe(self, input_array_name='last_output_array_name', tight=False,keep_ellipsoid=False):
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        sphere_df, radials , elipsoid_label = cryovesnet.get_sphere_dataframe(self.image, getattr(self, input_array_name),margin=2, tight=tight,keep_elipsoid=keep_elipsoid)
+        sphere_df, radials , ellipsoid_label = cryovesnet.get_sphere_dataframe(self.image, getattr(self, input_array_name),margin=2, tight=tight,keep_ellipsoid=keep_ellipsoid)
         radials = np.array(radials)
         self.radials = radials
         mu = np.mean(radials, axis=0)
@@ -589,23 +602,27 @@ class Pipeline():
         # print(len(sphere_df))
         sphere_df.to_pickle(self.sphere_df_path)
         self.sphere_df = sphere_df
-        return sphere_df,elipsoid_label
+        return sphere_df,ellipsoid_label
 
-    def make_spheres(self, input_array_name='last_output_array_name', tight= False, keep_elipsoid = False ,memkill=True):
+    def make_spheres(self, input_array_name='last_output_array_name', tight= False, keep_ellipsoid = False ,memkill=True):
         print("CryoVesNet Pipeline: Making vesicles spherical.")
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
-        _ , elipsoid_label = self.compute_sphere_dataframe(input_array_name, tight= tight,keep_elipsoid=keep_elipsoid)
+        _ , ellipsoid_tags = self.compute_sphere_dataframe(input_array_name, tight= tight,keep_ellipsoid=keep_ellipsoid)
         self.sphere_labels = cryovesnet.make_vesicle_from_sphere_dataframe(getattr(self, input_array_name), self.sphere_df)
-        if keep_elipsoid == True:
-            print("elipsoid_label",elipsoid_label)
-            # for on elipsoid_label and check where in the deep_labels is eqaul to the elipsoid_label and then put all these values in sphere_labels
+        if keep_ellipsoid == True and len(ellipsoid_tags) > 0:
+            print("ellipsoid_label",ellipsoid_tags)
+            # for on ellipsoid_label and check where in the deep_labels is eqaul to the ellipsoid_label and then put all these values in sphere_labels
             temp= getattr(self, input_array_name)
-            self.sphere_labels = np.zeros_like(self.sphere_labels)
-            for e in elipsoid_label:
-                sphere_labels = np.where(temp == e, temp, self.sphere_labels).astype(np.uint16)
-                self.sphere_labels= sphere_labels
+            ellipsoid_labels = np.zeros_like(self.sphere_labels)
+            for e in ellipsoid_tags:
+                ellipsoid_labels = np.where(temp == e, temp, self.sphere_labels).astype(np.uint16)
+            self.ellipsoid_labels= ellipsoid_labels
+            cryovesnet.save_label_to_mrc(self.ellipsoid_labels, self.ellipsoid_labels_path, template_path=self.image_path)
+            self.last_output_array_name = 'ellipsoid_labels'
+            self.print_output_info()
+
 
 
         cryovesnet.save_label_to_mrc(self.sphere_labels, self.sphere_labels_path, template_path=self.image_path)
@@ -629,11 +646,12 @@ class Pipeline():
         sphere_df['radius'] = sphere_df['radius'] + r
         sphere_df = sphere_df[sphere_df['mahalanobis'] < m]
         sphere_labels = cryovesnet.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
-        try:
+        # if cytomask is available, remove surrounding labels
+        if (self.cytomask_path.exists()):
             self.set_array('cytomask')
             surround_labels = cryovesnet.surround_remover(sphere_labels, self.cytomask, self.min_vol)
             sphere_df.drop(surround_labels)
-        except:
+        else:
             print("There is no cytomask file. Surrounding labels are not removed.")
 
 
