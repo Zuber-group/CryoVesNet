@@ -327,7 +327,7 @@ class Pipeline():
         for rescale in tqdm(np.linspace(min_rescale, max_rescale, num=nsteps, endpoint=True)):
             print(Style.BRIGHT + Fore.BLUE + f"CryoVesNet pipeline: run_deep_at_multiple_rescale - rescale = {rescale}" + Style.RESET_ALL)
             self.run_deep(force_run=True, rescale=rescale)
-            self.zoom(force_run=True)
+            self.rescale(force_run=True)
             larger_mask = self.deep_mask > max_deep_mask
             max_deep_mask[larger_mask] = self.deep_mask[larger_mask]
             deep_winners_mask[larger_mask] = rescale
@@ -358,7 +358,7 @@ class Pipeline():
         if memkill:
             self.clear_memory()
 
-    def zoom(self, force_run=False, slice_range=None,memkill=True):
+    def rescale(self, force_run=False, slice_range=None, memkill=True):
         """
         Zoom the deep mask
         :param memkill:
@@ -393,11 +393,11 @@ class Pipeline():
             self.clear_memory(exclude=[self.last_output_array_name, 'image'])
         self.print_output_info()
 
-    def label_vesicles_simply(self, input_array_name='last_output_array_name', threshold_coef=1.0, expanding=False,
-                              convex=False, separating =False,  memkill=True):
+    def label_vesicles_adaptive(self, input_array_name='last_output_array_name', threshold_coef=1.0, expanding=False,
+                                convex=False, separating =False, memkill=True):
         # threshold_coef=0.986
 
-        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: running label_vesicles_simply" + Style.RESET_ALL)
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: running label_vesicles_adaptive" + Style.RESET_ALL)
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
 

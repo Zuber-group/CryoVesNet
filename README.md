@@ -62,8 +62,8 @@ pl.run_deep(force_run=True)
 You cn set level of test time data augmentation by setting value of the augmentation_level. The default value is 1 which means no augmentation.
 > The signature of the run_deep method is as follows:<pre> run_deep(force_run=False, rescale=None, gauss=True, augmentation_level=1, weight_path=None) </pre> 
 
-5. Zoom the mask to the original size of the tomogram
-<pre>pl.zoom(force_run=True,slice_range=None)
+5. Rescale the mask to the original size of the tomogram
+<pre>pl.rescale(force_run=True,slice_range=None)
 </pre>
 > You can set slice_range to clean the mask in a specific Z range, for example, to clean top and bottom of the mask you can set  you can set of the slice_range = (50,150)
 > The signature of the zoom method is as follows:<pre> zoom(force_run=False, slice_range=None) </pre>
@@ -77,12 +77,12 @@ pl.label_vesicles(within_segmentation_region = True,)
 > <pre>label_vesicles(input_array_name='last_output_array_name', within_segmentation_region=False, threshold_coef=None,memkill=False)</pre>
 8. Generate fine tuned labels
 <pre>
-pl.label_vesicles_simply(separating =True)
+pl.label_vesicles_adaptive(separating =True)
 </pre>
 > Adaptive thresholding is used to separate the vesicles closely packed together, and expanding the small vesicles.
-> There are 3 main arguments in the label_vesicles_simply method, namely separating, expanding, and convex. The default values are False.
+> There are 3 main arguments in the label_vesicles_adaptive method, namely separating, expanding, and convex. The default values are False.
 > "When not specified otherwise, run_deep accepts these default parameters:
-> <pre>label_vesicles_simply(expanding=False,convex=False, separating =False,  memkill=True)</pre>
+> <pre>label_vesicles_adaptive(expanding=False,convex=False, separating =False,  memkill=True)</pre>
 9. Refinement using the radial profile
 <pre>
 pl.make_spheres()

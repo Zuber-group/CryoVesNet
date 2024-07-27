@@ -19,9 +19,9 @@ def run_pipeline():
     pl2.setup_cryovesnet_dir(initialize=False, make_masks=False)
 
     pl2.run_deep(force_run=True, gauss=True, rescale=None, augmentation_level=1, weight_path=None)
-    pl2.zoom(force_run=True, slice_range=[1,130])
+    pl2.rescale(force_run=True, slice_range=[1, 130])
     pl2.label_vesicles(input_array_name="deep_mask", within_segmentation_region=False, threshold_coef=0.7)
-    pl2.label_vesicles_simply(expanding=True, convex=True, sperating=True)
+    pl2.label_vesicles_adaptive(expanding=True, convex=True, sperating=True)
     df = pl2.make_spheres(tight=True, keep_ellipsoid=True)
     pl2.repair_spheres(m=4)
 
