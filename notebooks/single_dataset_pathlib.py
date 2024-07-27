@@ -14,18 +14,18 @@ import cryovesnet
 
 
 dataset_directory = Path("/media/amin/mtwo/Handpicked/116")
-dataset_directory = Path("E:/Amin_Khosrozadeh/emd_30365")
+dataset_directory = Path("E:/Amin_Khosrozadeh/116")
 
 
 
 
-pl2 = cryovesnet.Pipeline(dataset_directory,pattern='*.bin')
-pl2.setup_cryovesnet_dir(initialize=False, make_masks=False)
+pl2 = cryovesnet.Pipeline(dataset_directory,pattern='*.rec.nad')
+pl2.setup_cryovesnet_dir(initialize=False, make_masks=True)
 #
 #
 
 # pl2.run_deep(force_run=True, gauss=True, rescale= None,  weight_path=None)
-pl2.run_deep(force_run=False)
+pl2.run_deep(force_run=True)
 # pl2.run_deep(force_run=True, gauss=False, rescale= None, augmentation_level=4,  weight_path=None)
 pl2.rescale(force_run=True, slice_range=None)
 #pl2.rescale(force_run=True,slice_range=[1,130])
