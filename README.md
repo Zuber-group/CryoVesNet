@@ -31,7 +31,7 @@ To create the cytomask, you need to place the cell_outline.mod file in the same 
 You use the same script to build your pipeline, in case you are interested in all vesicles in tomograms you can set  in all vesicles within_segmentation_region = False.
 We used object object-orientated approach to build the pipeline. You can use the following [script](notebooks/single_dataset_pathlib.py) to build your pipeline and run different steps of the pipeline.
 
-In step 5 regarding using the pretrain network you need to set up the rescale factor proportional to the training dataset pixel size which is 22.40 Angstrom.
+In step 10, you can use the following script to run th pipeline on pre-trained model. 
 The steps are briefly explained as follows:
 0. Import the package
 <pre>
@@ -60,14 +60,14 @@ pl.run_deep(force_run=True)
 </pre>
 > We are rescaling the mask to the original size of the tomogram.
 You cn set level of test time data augmentation by setting value of the augmentation_level. The default value is 1 which means no augmentation.
-> The signature of the run_deep method is as follows:<pre> run_deep(force_run=False, rescale=None, gauss=True, augmentation_level=1, weight_path=None) </pre> 
+> The signature of the run_deep method is as follows:<pre> run_deep(force_run=False, rescale=None, gauss=True, augmentation_level=1, weight_path=None) </pre>
 
 5. Rescale the mask to the original size of the tomogram
 <pre>pl.rescale(force_run=True,slice_range=None)
 </pre>
 > You can set slice_range to clean the mask in a specific Z range, for example, to clean top and bottom of the mask you can set  you can set of the slice_range = (50,150)
 > The signature of the rescale method is as follows:<pre> rescale(force_run=False, slice_range=None) </pre>
-7. Generate primary labels if you do not have cell_outline.mod file in the same directory as the tomogram you can set within_segmentation_region = False
+6. Generate primary labels if you do not have cell_outline.mod file in the same directory as the tomogram you can set within_segmentation_region = False
 <pre>
 pl.label_vesicles(within_segmentation_region = True,)
 </pre>
@@ -75,7 +75,7 @@ pl.label_vesicles(within_segmentation_region = True,)
 > The global threshold is calculated to automatically. If you want to set the threshold on the mask you can set the threshold_coef to the value between 0 and 1.
 > The definition of the label_vesicles method is as follows:
 > <pre>label_vesicles(input_array_name='last_output_array_name', within_segmentation_region=False, threshold_coef=None,memkill=False)</pre>
-8. Generate fine tuned labels
+7. Generate fine tuned labels
 <pre>
 pl.label_vesicles_adaptive(separating =True)
 </pre>
@@ -83,21 +83,21 @@ pl.label_vesicles_adaptive(separating =True)
 > There are 3 main arguments in the label_vesicles_adaptive method, namely separating, expanding, and convex. The default values are False.
 > "When not specified otherwise, label_vesicles_adaptive accepts these default parameters:
 > <pre>label_vesicles_adaptive(expanding=False,convex=False, separating =False,  memkill=True)</pre>
-9. Refinement using the radial profile
+8. Refinement using the radial profile
 <pre>
 pl.make_spheres()
 </pre>
 > The make_spheres method has the following signature:
 > <pre>make_spheres(input_array_name='last_output_array_name', tight= False, keep_ellipsoid = False ,memkill=True) </pre>
 > If you want to keep the ellipsoid shape of the vesicles you can set keep_ellipsoid = True.
-10. Outlier detection and refinement
+9. Outlier detection and refinement
 <pre>
 pl.repair_spheres()
 </pre>
 > The repair_spheres method has the following signature:
 > <pre>repair_spheres( p=0.3, m=4, memkill=True)/pre>
 > which you can set the "m" as mahalonobis distance threshold and p as p-value threshold, to remove outlier. 
-11. This step ensures that the mod file is compatible with the pyto software
+10. This step ensures that the mod file is compatible with the pyto software
 <pre>
 pl.make_full_modfile(input_array_name='convex_labels')
 pl.make_full_label_file()
