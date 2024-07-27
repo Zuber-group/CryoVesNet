@@ -615,9 +615,7 @@ class Pipeline():
             print("ellipsoid_label",ellipsoid_tags)
             # for on ellipsoid_label and check where in the deep_labels is eqaul to the ellipsoid_label and then put all these values in sphere_labels
             temp= getattr(self, input_array_name)
-            ellipsoid_labels = np.zeros_like(self.sphere_labels)
-            for e in ellipsoid_tags:
-                ellipsoid_labels = np.where(temp == e, temp, self.sphere_labels).astype(np.uint16)
+            ellipsoid_labels = np.where(np.isin(temp, ellipsoid_tags), temp, self.sphere_labels).astype(np.uint16)
             self.ellipsoid_labels= ellipsoid_labels
             cryovesnet.save_label_to_mrc(self.ellipsoid_labels, self.ellipsoid_labels_path, template_path=self.image_path)
             self.last_output_array_name = 'ellipsoid_labels'

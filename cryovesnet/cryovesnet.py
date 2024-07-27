@@ -508,7 +508,7 @@ def get_sphere_dataframe(image, image_label, margin=5,tight=False,keep_ellipsoid
     centroids = get_centroids_from_regions(vesicle_regions)
     labels = get_labels_from_regions(vesicle_regions)
     thicknesses, densities, radii, centers, kept_labels,my_radial = [],[],[],[],[],[]
-    ellipsoid_label= []
+    ellipsoid_tags= []
     for i in tqdm(range(len(vesicle_regions)), desc="fitting sphere to vesicles"):
         label = labels[i]
         radius = get_label_largest_radius(bboxes[i])  # this is an integer
@@ -553,7 +553,7 @@ def get_sphere_dataframe(image, image_label, margin=5,tight=False,keep_ellipsoid
 
                     if abs(density - mean_density) / std_density < threshold and abs(
                             radius - mean_radius) / std_radius < threshold+1:
-                                ellipsoid_label.append(label)
+                                ellipsoid_tags.append(label)
 
 
 
@@ -561,7 +561,7 @@ def get_sphere_dataframe(image, image_label, margin=5,tight=False,keep_ellipsoid
     df = pd.DataFrame(zip(kept_labels, thicknesses, densities, radii, centers),
                           columns=['label','thickness','density','radius','center'])
     df = df.set_index('label')
-    return df,my_radial,ellipsoid_label
+    return df,my_radial,ellipsoid_tags
 
 
 def get_sphere_parameters(image, label, margin, radius, rounded_centroid,max_cycles = 10, tight=False):
