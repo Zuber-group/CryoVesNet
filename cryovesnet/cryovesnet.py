@@ -752,6 +752,8 @@ def collision_solver(deep_mask, deep_labels, ves_table, threshold, delta_size=1)
 
     collision_ves = ves_table[
         (ves_table['extent'] < EXTENT_THRESHOLD) & (ves_table['area_zscore'] > AREA_ZSCORE_THRESHOLD)]
+    # Vesicles with low extent and high area_zscore are considered to be colliding
+    print("Collision vesicles:")
     print(collision_ves)
 
     old_mask = deep_mask.copy()
@@ -781,13 +783,6 @@ def collision_solver(deep_mask, deep_labels, ves_table, threshold, delta_size=1)
                 temp[~vesicle_mask] = False  # Only consider the area of the current vesicle
                 nc = skimage.morphology.label(temp, return_num=True, connectivity=None)[1]
                 if nc > pre_nc:
-                    # Set the edges of sub_old_label to LABEL_OFFSET for visualization
-                    # sub_old_label[0, :, :] = LABEL_OFFSET
-                    # sub_old_label[-1, :, :] = LABEL_OFFSET
-                    # sub_old_label[:, 0, :] = LABEL_OFFSET
-                    # sub_old_label[:, -1, :] = LABEL_OFFSET
-                    # sub_old_label[:, :, 0] = LABEL_OFFSET
-                    # sub_old_label[:, :, -1] = LABEL_OFFSET
 
                     old_label_slice = old_label[sub_slice[0], sub_slice[1], sub_slice[2]]
 
@@ -854,6 +849,7 @@ def remove_outliers(deep_labels,ves_table, min_vol ):
     verysmall_vesicles = ves_table[(ves_table['extent'] < 0.25 ) | (ves_table['extent'] > 0.75) | (ves_table['area'] < 1* min_vol)]
     # verysmall_vesicles = ves_table[(ves_table['area'] < 1 * min_vol)]
     verysmall_vesicles = verysmall_vesicles.set_index('label')
+    print("Vesicles to remove:")
     print(verysmall_vesicles)
     new_label[np.isin(new_label, verysmall_vesicles.index)] = 0
     return new_label,verysmall_vesicles
@@ -1229,7 +1225,6 @@ def run_default_pipeline(dataset_dir,force=False,scale_proportion=1.0,within_cyt
     myPipeline = pipeline.Pipeline(dataset_dir)
     myPipeline.setup_cryovesnet_dir()
     # myPipeline.evaluation()
-    myPipeline.network_size = 128
     myPipeline.run_deep(force_run=force,rescale=scale_proportion)
     myPipeline.zoom(force_run=force)
     myPipeline.label_vesicles(within_segmentation_region =within_cytoplasm)

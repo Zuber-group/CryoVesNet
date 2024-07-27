@@ -27,6 +27,11 @@ from scipy.stats import chi2, pearsonr, spearmanr
 from collections.abc import Iterable
 import subprocess
 import shutil
+from colorama import init, Fore, Style
+
+# Initialize colorama (required for Windows)
+init()
+
 
 try:
     import tensorflow.compat.v1 as tf
@@ -69,7 +74,7 @@ class Pipeline():
     def __init__(self, path_to_folder, pattern='*.rec.nad'):
         # BZ replaced self.path_to_folder by self.dir
         self.dir = Path(path_to_folder).absolute()
-        print(f"CryoVesNet Pipeline: the pipeline is created for {self.dir}")
+        print(Style.BRIGHT + Fore.BLUE + f"CryoVesNet Pipeline: the pipeline is created for {self.dir}" + Style.RESET_ALL)
         # BZ to get a clearer overview of data structure, all directory paths are defined here
         self.deep_dir = self.dir / 'deep'
         self.save_dir = self.dir / 'cryovesnet'
@@ -307,7 +312,7 @@ class Pipeline():
         self.prepare_deep(erase_existing=force_run)
         if self.deep_dir.exists() and len(list(self.deep_dir.glob('*'))) >= 4 and not force_run:
             return
-        print("CryoVesNet pipeline: Running unet segmentation if there are less than 4 file in ./deep directory")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet pipeline: Running unet segmentation if there are less than 4 file in ./deep directory" + Style.RESET_ALL)
         # segseg.full_segmentation(weight_path, self.image_path, self.deep_dir, rescale=rescale, gauss=True)
         segseg.full_segmentation(weight_path, self.image_path, self.deep_dir, rescale=rescale, gauss=gauss, augmentation_level=augmentation_level)
 
@@ -320,7 +325,7 @@ class Pipeline():
         max_deep_mask = np.zeros_like(self.image, dtype=np.float16)
         deep_winners_mask = np.zeros_like(self.image, dtype=np.float16)
         for rescale in tqdm(np.linspace(min_rescale, max_rescale, num=nsteps, endpoint=True)):
-            print(f"CryoVesNet pipeline: run_deep_at_multiple_rescale - rescale = {rescale}")
+            print(Style.BRIGHT + Fore.BLUE + f"CryoVesNet pipeline: run_deep_at_multiple_rescale - rescale = {rescale}" + Style.RESET_ALL)
             self.run_deep(force_run=True, rescale=rescale)
             self.zoom(force_run=True)
             larger_mask = self.deep_mask > max_deep_mask
@@ -332,7 +337,7 @@ class Pipeline():
         cryovesnet.save_label_to_mrc(self.deep_winners_mask, self.deep_winners_mask_path, template_path=self.image_path)
 
     def setup_cryovesnet_dir(self, make_masks=True, initialize=False, memkill=True):
-        print("CryoVesNet Pipeline: setting up cryovesnet directory")
+        print(Style.BRIGHT + Fore.BLUE +"CryoVesNet Pipeline: setting up cryovesnet directory" + Style.RESET_ALL)
         self.save_dir.mkdir(exist_ok=True)
         if initialize:
             self.deep_labels = np.zeros(self.image_shape, dtype=np.uint16)
@@ -342,15 +347,14 @@ class Pipeline():
         if make_masks:
             #chech if the cell_outline_mod_path exists
             if not self.cell_outline_mod_path.exists():
-                raise ValueError("cell_outline_mod_path does not exist")
+                raise ValueError("cell_outline_mod_path does not exist, make sure you have cell_outline.mod in the directory or specify make_masks=False in the setup_cryovesnet_dir")
             else:
                 self.set_segmentation_region_from_mod()
             #check if the active_zone_mod_path exists
             if not self.active_zone_mod_path.exists():
-                raise ValueError("active_zone_mod_path does not exist")
+                print("active_zone_mod_path does not exist!")
             else:
                 self.set_active_zone_array_from_mod()
-            self.set_active_zone_array_from_mod()
         if memkill:
             self.clear_memory()
 
@@ -360,7 +364,7 @@ class Pipeline():
         :param memkill:
         :return:
         """
-        print("CryoVesNet Pipeline: zooming the unet mask")
+        print(Style.BRIGHT + Fore.BLUE +"CryoVesNet Pipeline: zooming the unet mask" + Style.RESET_ALL)
         self.last_output_array_name = 'deep_mask'
         if self.deep_mask_path.exists() and not force_run:
             print("Skipping because a full sized deep mask is already saved on the disk.")
@@ -393,7 +397,7 @@ class Pipeline():
                               convex=False, sperating =True,  memkill=True):
         # threshold_coef=0.986
 
-        print("CryoVesNet Pipeline: running label_vesicles_simply")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: running label_vesicles_simply" + Style.RESET_ALL)
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
 
@@ -459,7 +463,7 @@ class Pipeline():
         self.print_output_info()
         return ves_table,badVesicles
 
-    def label_vesicles(self, input_array_name='last_output_array_name', within_segmentation_region=True, threshold_coef=None,
+    def label_vesicles(self, input_array_name='last_output_array_name', within_segmentation_region=False, threshold_coef=None,
                        memkill=False):
         """label vesicles from the zoomed deep mask
         :param input_array_name: name of the array to be labelled
@@ -468,7 +472,7 @@ class Pipeline():
         :param memkill:
         :return:
         """
-        print("CryoVesNet Pipeline: running label_vesicles")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: running label_vesicles" + Style.RESET_ALL)
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
 
@@ -476,7 +480,12 @@ class Pipeline():
         self.set_array(input_array_name)
         self.deep_mask = getattr(self, input_array_name)
         if within_segmentation_region:
-            self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
+            if self.cytomask_path.exists():
+                self.set_array('cytomask')
+                self.outcell_remover(input_array_name='deep_mask', output_array_name='deep_mask', memkill=False)
+            else:
+                print(Style.BRIGHT +
+                    Fore.YELLOW + "Warning: cytomask is not set. Skipping outcell removal. If you do not want to remove outcell vesicles, set within_segmentation_region to False." + Style.RESET_ALL)
 
         if threshold_coef is None:
             opt_th, _ = segseg.find_threshold(self.image, self.deep_mask,min_th=0.8)
@@ -504,7 +513,7 @@ class Pipeline():
 
     def outcell_remover(self, input_array_name='last_output_array_name',
                         output_array_name='deep_labels', memkill=True, force_generate=False):
-        print("CryoVesNet Pipeline: restricting labels to segmentation region")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: restricting labels to segmentation region" + Style.RESET_ALL)
         self.set_segmentation_region_from_mod()
         self.set_array(input_array_name)
         bounded_array = getattr(self, input_array_name) * self.cytomask
@@ -518,7 +527,7 @@ class Pipeline():
         self.print_output_info()
 
     def threshold_tuner(self, input_array_name='last_output_array_name', memkill=True):
-        print('CryoVesNet Pipeline: running threshold_tuner')
+        print(Style.BRIGHT + Fore.BLUE + 'CryoVesNet Pipeline: running threshold_tuner' + Style.RESET_ALL)
         self.set_array('image')
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
@@ -543,7 +552,7 @@ class Pipeline():
         self.print_output_info()
 
     def label_convexer(self, input_array_name='last_output_array_name', memkill=True):
-        print("CryoVesNet Pipeline: making vesicles convex")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: making vesicles convex" + Style.RESET_ALL)
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
@@ -560,7 +569,7 @@ class Pipeline():
         :param
         :return:
         """
-        print("CryoVesNet Pipeline: interactive cleaning. To continue close the napari window.")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: interactive cleaning. To continue close the napari window." + Style.RESET_ALL)
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
@@ -605,7 +614,7 @@ class Pipeline():
         return sphere_df,ellipsoid_label
 
     def make_spheres(self, input_array_name='last_output_array_name', tight= False, keep_ellipsoid = False ,memkill=True):
-        print("CryoVesNet Pipeline: Making vesicles spherical.")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: Making vesicles spherical." + Style.RESET_ALL)
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
@@ -631,14 +640,13 @@ class Pipeline():
         return self.sphere_df
 
     def repair_spheres(self, input_array_name='last_output_array_name',  memkill=True, m=4, r=0):
-        print("CryoVesNet Pipeline: Repairing vesicles.")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: Repairing vesicles." + Style.RESET_ALL)
 
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
         # deep_labels = self.deep_labels.copy()
         sphere_labels = self.sphere_labels.copy()
-        print(self.min_vol)
 
         sphere_df = pd.read_pickle(self.sphere_df_path)
         sphere_df['radius'] = sphere_df['radius'] + r
@@ -650,7 +658,7 @@ class Pipeline():
             surround_labels = cryovesnet.surround_remover(sphere_labels, self.cytomask, self.min_vol)
             sphere_df.drop(surround_labels)
         else:
-            print("There is no cytomask file. Surrounding labels are not removed.")
+            print(Style.BRIGHT + Fore.YELLOW + "Warning: cytomask is not set. Surrounding labels are not removed." + Style.RESET_ALL)
 
 
 
@@ -659,6 +667,7 @@ class Pipeline():
         # print(temp)
         while (len(temp) > 0):
             print("#############################################################################")
+            print(Fore.GREEN + "Adjacent vesicles: "+ Style.RESET_ALL)
             print(temp)
             for x in temp:
                 # print(x)
@@ -686,12 +695,11 @@ class Pipeline():
                     # temp = np.delete(temp,np.where(temp==[q,p]))
             temp = cryovesnet.adjacent_vesicles(sphere_df)
             edited = []
-        print(temp)
 
         sphere_df = sphere_df[sphere_df['radius'] > self.min_radius]
         # self.convex_labels = temp_best_corrected_labels
         self.convex_labels = cryovesnet.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
-        print(len(sphere_df))
+        print("Number of vesicles: ", len(sphere_df))
         cryovesnet.save_label_to_mrc(self.convex_labels, self.convex_labels_path, template_path=self.image_path)
         self.last_output_array_name = 'convex_labels'
         if memkill:
@@ -712,6 +720,8 @@ class Pipeline():
             "You should inspect the labels that have a high mahalanobis distance as they are the likeliest to be wrongly segmented")
 
     def fix_spheres_interactively(self, input_array_name='last_output_array_name', max_expected_diameter=50 ,memkill=True):
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: fixing interactively" + Style.RESET_ALL)
+
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array('image')
@@ -733,7 +743,7 @@ class Pipeline():
         :param memkill:
         :return:
         """
-        print("CryoVesNet Pipeline: removing small labels")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: removing small labels" + Style.RESET_ALL)
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
@@ -758,7 +768,7 @@ class Pipeline():
         self.print_output_info()
 
     def visualization_old_new(self, input_array_name1, input_array_name2, memkill=True):
-        print("CryoVesNet Pipeline: visualizing two sets of labels. To continue, close napari window")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: visualizing two sets of labels. To continue, close napari window" + Style.RESET_ALL)
         self.set_array('image')
         self.set_array(input_array_name1)
         self.set_array(input_array_name2)
@@ -771,7 +781,7 @@ class Pipeline():
         """
         copy initial pyto to a project subfolder
         """
-        print("CryoVesNet Pipeline: setting up pyto folder")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: setting up pyto folder" + Style.RESET_ALL)
         if self.pyto_dir.exists():
             if overwrite:
                 self.pyto_dir.unlink()
@@ -787,7 +797,7 @@ class Pipeline():
         convert the vesicle label file to a modfile and merge it with the initial modfile
         do_rearrange_labels: if True, then no empty label in the input labels array are left
         """
-        print("CryoVesNet Pipeline: making full mod file")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: making full mod file" + Style.RESET_ALL)
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
         self.set_array(input_array_name)
@@ -825,7 +835,7 @@ class Pipeline():
         Assemble full label file from masks and full mod file
         :return:
         """
-        print("CryoVesNet Pipeline: making full label file")
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: making full label file" + Style.RESET_ALL)
         self.full_labels = np.zeros(self.image_shape, dtype=np.uint16)
         if include_segmentation_region:
             self.set_segmentation_region_from_mod()
