@@ -32,9 +32,9 @@ pl2.zoom(force_run=True,slice_range=None)
 pl2.label_vesicles(input_array_name="deep_mask", within_segmentation_region=True,threshold_coef=None)
 # pl2.label_vesicles(input_array_name="deep_mask", within_segmentation_region=False,threshold_coef=0.9)
 
-pl2.label_vesicles_simply( expanding = False,convex=False,sperating=True)
-df = pl2.make_spheres(tight=True, keep_ellipsoid=True)
-pl2.repair_spheres(m=4)
+pl2.label_vesicles_simply( expanding = False,convex=False,separating=True)
+df = pl2.make_spheres(tight=False, keep_ellipsoid=False)
+pl2.repair_spheres()
 
 
 # pl2.make_full_modfile(input_array_name='convex_labels')

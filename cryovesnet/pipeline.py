@@ -394,7 +394,7 @@ class Pipeline():
         self.print_output_info()
 
     def label_vesicles_simply(self, input_array_name='last_output_array_name', threshold_coef=1.0, expanding=False,
-                              convex=False, sperating =True,  memkill=True):
+                              convex=False, separating =False,  memkill=True):
         # threshold_coef=0.986
 
         print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: running label_vesicles_simply" + Style.RESET_ALL)
@@ -431,7 +431,7 @@ class Pipeline():
         # deep_labels, small_labels = cryovesnet.expand_small_labels(self.deep_mask, deep_labels, threshold, self.min_vol,p=1, q=4, t=0.8)
 
 
-        if sperating:
+        if separating:
             ves_table = cryovesnet.vesicles_table(deep_labels)
             deep_labels = cryovesnet.collision_solver(self.deep_mask, deep_labels, ves_table, self.threshold_tuned_labels , delta_size=10)
 
@@ -639,7 +639,7 @@ class Pipeline():
         self.print_output_info()
         return self.sphere_df
 
-    def repair_spheres(self, input_array_name='last_output_array_name',  memkill=True, m=4, r=0):
+    def repair_spheres(self, input_array_name='last_output_array_name',  memkill=True, p= 0.3, m=4, r=0):
         print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: Repairing vesicles." + Style.RESET_ALL)
 
         if input_array_name == 'last_output_array_name':
@@ -651,6 +651,7 @@ class Pipeline():
         sphere_df = pd.read_pickle(self.sphere_df_path)
         sphere_df['radius'] = sphere_df['radius'] + r
         sphere_df = sphere_df[sphere_df['mahalanobis'] < m]
+        sphere_df = sphere_df[sphere_df['corr'] > p]
         sphere_labels = cryovesnet.make_vesicle_from_sphere_dataframe(sphere_labels, sphere_df)
         # if cytomask is available, remove surrounding labels
         if (self.cytomask_path.exists()):

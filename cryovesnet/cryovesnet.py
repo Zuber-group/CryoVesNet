@@ -1220,21 +1220,21 @@ def rearrange_labels(image_label, dtype=np.int16):
     return lookup_table[image_label]
 
 
-def run_default_pipeline(dataset_dir,force=False,scale_proportion=1.0,within_cytoplasm=False):
+def run_default_pipeline(dataset_dir,force=True,scale_proportion=None,within_cytoplasm=False):
     dataset_dir = Path(dataset_dir)
     myPipeline = pipeline.Pipeline(dataset_dir)
-    myPipeline.setup_cryovesnet_dir()
+    myPipeline.setup_cryovesnet_dir(make_masks=within_cytoplasm)
     # myPipeline.evaluation()
     myPipeline.run_deep(force_run=force,rescale=scale_proportion)
     myPipeline.zoom(force_run=force)
     myPipeline.label_vesicles(within_segmentation_region =within_cytoplasm)
-    # myPipeline.label_vesicles_simply(within_segmentation_region =within_cytoplasm)
+    myPipeline.label_vesicles_simply(separating=True)
     # myPipeline.threshold_tuner()
     # myPipeline.label_convexer()
     myPipeline.make_spheres()
     myPipeline.repair_spheres()
-    myPipeline.make_full_modfile()
-    myPipeline.make_full_label_file()
+    #myPipeline.make_full_modfile()
+    #myPipeline.make_full_label_file()
 
     # myPipeline.remove_small_labels()
     # myPipeline.make_full_modfile()
