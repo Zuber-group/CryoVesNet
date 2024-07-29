@@ -12,7 +12,7 @@ setup(
     package_data={'': ['weights/weights.h5']},
     include_package_data=True,
     install_requires=[
-        'numpy',
+        'numpy<2',
         'scikit-image',
         'scipy',
         'jupyter',
@@ -27,7 +27,7 @@ setup(
         'keras==2.9.0',
         'tensorflow<2.10'
     ],
-    python_requires='>=3.10',
+    python_requires='>=3.9',
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',

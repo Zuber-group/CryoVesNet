@@ -166,6 +166,11 @@ pl = cryovesnet.Pipeline(dataset_directory,pattern="*.rec.nad")
 pl.setup_cryovesnet_dir(make_masks= False, initialize=False)
 pl.fix_spheres_interactively()
 </pre>
+## Windows users
+> Caution: TensorFlow 2.10 was the last TensorFlow release that supported GPU on native-Windows. Starting with TensorFlow 2.11, you will need to install TensorFlow in WSL2, or install tensorflow or tensorflow-cpu and, optionally, try the TensorFlow-DirectML-Plugin
+<pre> conda install -c conda-forge cudatoolkit=11.2 cudnn=8.1.0</pre>
+<pre> conda install -c conda-forge tensorflow=2.10 </pre>
+
 ##  Runtime efficiency of the pipeline
 The runtime of pipeline for a tomogram with pixel size 14.69, without making the mod file is around 200 second on a single GPU (~ A4000 Nvidia GPU).
 Almost 20-30 pecent of the time is spent on running the pre-trained network. In the figure bellow, the runtime of the pipeline is shown. (with mod file generation)
