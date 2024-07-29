@@ -167,7 +167,12 @@ pl.setup_cryovesnet_dir(make_masks= False, initialize=False)
 pl.fix_spheres_interactively()
 </pre>
 ## Windows users
-> Caution: TensorFlow 2.10 was the last TensorFlow release that supported GPU on native-Windows. Starting with TensorFlow 2.11, you will need to install TensorFlow in WSL2, or install tensorflow or tensorflow-cpu and, optionally, try the TensorFlow-DirectML-Plugin
+> GPU support for native Windows ended with TensorFlow 2.10. From TensorFlow 2.11 onwards, you have the following options:
+> 1. Install TensorFlow in Windows Subsystem for Linux 2 (WSL2)
+> 2. Install the CPU-only version of TensorFlow
+> 3. Optionally, experiment with the TensorFlow-DirectML-Plugin
+> 
+> If you want to use GPU on native Windows, use this solution:
 <pre> conda install -c conda-forge cudatoolkit=11.2 cudnn=8.1.0</pre>
 <pre> conda install -c conda-forge tensorflow=2.10 </pre>
 
