@@ -12,7 +12,7 @@ You can install the package using conda and pip. After cloning the repository, y
 1. Clone the repository
 <pre> git clone https://github.com/Zuber-group/CryoVesNet/</pre>
 2. Create a conda environment
-<pre> conda create -n CryoVesNet python=3.10</pre>
+<pre> conda create -n CryoVesNet python=3.9</pre>
 3. Activate the conda environment
 <pre>  conda activate CryoVesNet </pre>
 4. Install the pre-requirements

@@ -14,7 +14,7 @@ import cryovesnet
 
 
 dataset_directory = Path("/media/amin/mtwo/Handpicked/116")
-dataset_directory = Path("E:/Amin_Khosrozadeh/134")
+# dataset_directory = Path("E:/Amin_Khosrozadeh/134")
 
 
 
