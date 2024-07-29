@@ -31,7 +31,7 @@ To create the cytomask, you need to place the cell_outline.mod file in the same 
 You use the same script to build your pipeline, in case you are interested in all vesicles in tomograms you can set  in all vesicles within_segmentation_region = False.
 We used object object-orientated approach to build the pipeline. You can use the following [script](notebooks/single_dataset_pathlib.py) to build your pipeline and run different steps of the pipeline.
 
-In step 10, you can use the following script to run the pipeline on pre-trained model. 
+You can use the following steps to run the pipeline on pre-trained model. 
 The steps are briefly explained as follows:
 
 0. Import the package
