@@ -189,7 +189,7 @@ and to verify the installation you can use the following command:
 The runtime of pipeline for a tomogram with pixel size 14.69, without making the mod file is around 200 second on a single GPU (~ A4000 Nvidia GPU).
 Almost 20-30 pecent of the time is spent on running the pre-trained network. In the figure bellow, the runtime of the pipeline is shown. (with mod file generation)
 ![Pipeline](images/efficiency.png)
-We have tested the pipeline on a Macbook Pro M1 without any GPU utilization, and whole procedure took around 27.5 minutes for a tomogram with pixel size 14.69.
+We have tested the pipeline on a Macbook Pro M1 without any GPU utilization, and whole procedure took around 27.5 minutes for a tomogram with size 1024x1024x261 voxels and voxel size of 14.69.
 ## Train and create your own dataset
 The notebooks allow to [generate the training data](notebooks/create_trainingset.ipynb) and [train the network](notebooks/training_vesicles.ipynb). Pre-trained weights for the network are provided in the weights folder.
 
