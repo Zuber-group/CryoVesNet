@@ -33,6 +33,7 @@ We used object object-orientated approach to build the pipeline. You can use the
 
 In step 10, you can use the following script to run the pipeline on pre-trained model. 
 The steps are briefly explained as follows:
+
 0. Import the package
 <pre>
 import cryovesnet
