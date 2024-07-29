@@ -31,7 +31,7 @@ To create the cytomask, you need to place the cell_outline.mod file in the same 
 You use the same script to build your pipeline, in case you are interested in all vesicles in tomograms you can set  in all vesicles within_segmentation_region = False.
 We used object object-orientated approach to build the pipeline. You can use the following [script](notebooks/single_dataset_pathlib.py) to build your pipeline and run different steps of the pipeline.
 
-In step 10, you can use the following script to run th pipeline on pre-trained model. 
+In step 10, you can use the following script to run the pipeline on pre-trained model. 
 The steps are briefly explained as follows:
 0. Import the package
 <pre>
@@ -59,7 +59,7 @@ By default, the setup_cryovesnet_dir function called like this: <pre>setup_cryov
 pl.run_deep(force_run=True)
 </pre>
 > We are rescaling the mask to the original size of the tomogram.
-You cn set level of test time data augmentation by setting value of the augmentation_level. The default value is 1 which means no augmentation.
+You can set level of test time data augmentation by setting value of the augmentation_level. The default value is 1 which means no augmentation.
 > The signature of the run_deep method is as follows:<pre> run_deep(force_run=False, rescale=None, gauss=True, augmentation_level=1, weight_path=None) </pre>
 
 5. Rescale the mask to the original size of the tomogram
@@ -96,7 +96,7 @@ pl.repair_spheres()
 </pre>
 > The repair_spheres method has the following signature:
 > <pre>repair_spheres( p=0.3, m=4, memkill=True)/pre>
-> which you can set the "m" as mahalonobis distance threshold and p as p-value threshold, to remove outlier. 
+> which you can set the "m" as Mahalonobis distance threshold and p as p-value threshold, to remove outlier. 
 10. This step ensures that the mod file is compatible with the pyto software
 <pre>
 pl.make_full_modfile(input_array_name='convex_labels')
@@ -185,7 +185,7 @@ The notebooks allow to [generate the training data](notebooks/create_trainingset
 
 ## Pyto
 
-This repository includes scripts or code from external packages. To ensure integration or extended capabilities, inclusions is from the [Pyto](https://github.com/vladanl/Pyto) project. In case you want to segemnt the connectors and teathers afterwards you can use this software.
+This repository includes scripts or code from external packages. To ensure integration or extended capabilities, inclusions is from the [Pyto](https://github.com/vladanl/Pyto) project. In case you want to segment the connectors and tethers afterwards you can use this software.
 
 ## Citation
 
