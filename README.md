@@ -169,7 +169,7 @@ pl.fix_spheres_interactively()
 ## Windows users
 > GPU support for native Windows ended with TensorFlow 2.10. From TensorFlow 2.11 onwards, you have the following options:
 > 1. Install TensorFlow in Windows Subsystem for Linux 2 (WSL2)
-> 2. Install the CPU-only version of TensorFlow
+> 2. Install the CPU-only version of TensorFlow, remove the tensorflow<2.10 from setup.py and install the package. We have tested with Keras < 3
 > 3. Optionally, experiment with the TensorFlow-DirectML-Plugin
 > 
 > If you want to use GPU on native Windows, use this solution:
