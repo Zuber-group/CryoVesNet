@@ -107,7 +107,11 @@ pl.make_full_label_file()
 In the most simple case, you can use the following script to run the pipeline.
 <pre>
 import cryovesnet
-cryovesnet.run_default_pipeline('/mnt/data/amin/testtest/2')
+pl = cryovesnet.run_default_pipeline('/mnt/data/amin/testtest/2')
+</pre>
+and if you want to see and edit the result you can use the following command.
+<pre>
+pl.fix_spheres_interactively()
 </pre>
 
 ## Folder Structure
@@ -173,13 +177,18 @@ pl.fix_spheres_interactively()
 > 3. Optionally, experiment with the TensorFlow-DirectML-Plugin
 > 
 > If you want to use GPU on native Windows, use this solution:
-<pre> conda install -c conda-forge cudatoolkit=11.2 cudnn=8.1.0</pre>
-<pre> conda install -c conda-forge tensorflow=2.10 </pre>
+<pre>conda install -c conda-forge cudatoolkit=11.2 cudnn=8.1.0
+conda install -c conda-forge tensorflow=2.10 </pre>
+and to verify the installation you can use the following command:
+<pre>python -c "import tensorflow as tf; print(tf.config.list_physical_devices('GPU'))"
+</pre>
+
 
 ##  Runtime efficiency of the pipeline
 The runtime of pipeline for a tomogram with pixel size 14.69, without making the mod file is around 200 second on a single GPU (~ A4000 Nvidia GPU).
 Almost 20-30 pecent of the time is spent on running the pre-trained network. In the figure bellow, the runtime of the pipeline is shown. (with mod file generation)
 ![Pipeline](images/efficiency.png)
+We have tested the pipeline on a Macbook Pro M1 without any GPU utilization, and whole procedure took around 27.5 minutes for a tomogram with pixel size 14.69.
 ## Train and create your own dataset
 The notebooks allow to [generate the training data](notebooks/create_trainingset.ipynb) and [train the network](notebooks/training_vesicles.ipynb). Pre-trained weights for the network are provided in the weights folder.
 
@@ -192,22 +201,24 @@ This repository includes scripts or code from external packages. To ensure integ
 If you utilize our software in your research, please acknowledge its use by citing this work. Our software may integrate or rely on various third-party tools; hence, we recommend citing those as appropriately detailed in their documentation.
 https://doi.org/10.1101/2024.02.26.582080
 
-<details><summary>Bibtex</summary><p>
+<details>
+<summary>Bibtex</summary>
+<p>
 
-```
-@article {Khosrozadeh2024.02.26.582080,
-	author = {Amin Khosrozadeh and Raphaela Seeger and Guillaume Witz and Julika Radecke and Jakob B. S{\o}rensen and Beno{\^\i}t Zuber},
-	title = {CryoVesNet: A Dedicated Framework for Synaptic Vesicle Segmentation in Cryo Electron Tomograms},
-	elocation-id = {2024.02.26.582080},
-	year = {2024},
-	doi = {10.1101/2024.02.26.582080},
-	URL = {https://www.biorxiv.org/content/early/2024/02/28/2024.02.26.582080},
-	eprint = {https://www.biorxiv.org/content/early/2024/02/28/2024.02.26.582080.full.pdf},
-	journal = {bioRxiv}
+```bibtex
+@article{Khosrozadeh2024.02.26.582080,
+    author = {Amin Khosrozadeh and Raphaela Seeger and Guillaume Witz and Julika Radecke and Jakob B. S{\o}rensen and Beno{\^\i}t Zuber},
+    title = {CryoVesNet: A Dedicated Framework for Synaptic Vesicle Segmentation in Cryo Electron Tomograms},
+    elocation-id = {2024.02.26.582080},
+    year = {2024},
+    doi = {10.1101/2024.02.26.582080},
+    URL = {https://www.biorxiv.org/content/early/2024/02/28/2024.02.26.582080},
+    eprint = {https://www.biorxiv.org/content/early/2024/02/28/2024.02.26.582080.full.pdf},
+    journal = {bioRxiv}
 }
 ```
-</p></details>
-
+</p>
+</details>
 
 
 ## Schematic Workflow
