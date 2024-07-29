@@ -12,6 +12,7 @@ setup(
     package_data={'': ['weights/weights.h5']},
     include_package_data=True,
     install_requires=[
+        'colorama',
         'numpy<2',
         'scikit-image',
         'scipy',
