@@ -168,7 +168,7 @@ You can use the following script to run the pipeline.
 import cryovesnet
 dataset_directory = Path("/mnt/data/tomogram_133/")
 pl = cryovesnet.Pipeline(dataset_directory,pattern="*.rec.nad")
-pl.setup_cryovesnet_dir(make_masks= False, initialize=False)
+pl.setup_cryovesnet_dir(make_masks= False, initialize=True)
 pl.fix_spheres_interactively()
 </pre>
 ## Windows users
