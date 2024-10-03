@@ -55,10 +55,15 @@ and are also a consequence of the changed behavior of scipy.
   while vesicleIds only ids of vesicles. Attribute ids may be changed in future.
 
 
-$Id: vesicles.py 1184M 2017-03-24 13:22:06Z (local) $
+$Id$
 Author: Vladan Lucic 
 """
-__version__ = "$Revision: 1184M $"
+from __future__ import print_function
+from builtins import zip
+#from builtins import str
+from past.builtins import basestring
+
+__version__ = "$Revision$"
 
 import sys
 import os
@@ -76,7 +81,7 @@ import pyto.scripts.common as common
 tomo_info = common.__import__(name='tomo_info', path='../common')
 
 # to debug replace INFO by DEBUG
-logging.basicConfig(level=logging.DEBUG,
+logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s %(levelname)s %(message)s',
                     datefmt='%d %b %Y %H:%M:%S')
 
@@ -121,12 +126,13 @@ labels_shape = None   # shape given in header of the labels file (if em
 #labels_shape = (100, 120, 90) # shape given here
 
 # labels file data type (e.g. 'int8', 'uint8', 'int16', 'int32', 'float16', 'float64') 
-labels_data_type = 'int16'
+if tomo_info is not None: labels_data_type = tomo_info.labels_data_type
+#labels_data_type = 'uint8'
 
 # labels file byte order ('<' for little-endian, '>' for big-endian)
 labels_byte_order = '<'
 
-# labels file array order ('FORTRAN' for x-axis fastest, 'C' for z-axis fastest)
+# labels file array order ('F' for x-axis fastest, 'C' for z-axis fastest)
 labels_array_order = 'F'
 
 # offset of labels in respect to the image (None means 0-offset)
@@ -141,17 +147,18 @@ labels_offset = None             # no offset
 # Calculation related parameters
 #
 
-# ids of all segments for single labels file, segments with other ids are 
+# ids of all segments for single labels file. Segments with other ids are 
 # removed 
 #all_ids = [1,3,4,6]       # individual ids, single file
 #all_ids = range(1,119)  # range of ids, single file
 #all_ids = None         # all ids are to be used, single file
-
-# ids of all segments for multiple labels files can use all above forms,
-# the following means ids 2, 3 and 6 from labels_1, all ids from labels_2 and
-# ids 3, 4, ... 8 from labels_3
 if tomo_info is not None: all_ids = tomo_info.all_ids
-#all_ids = ([1, 3,4,6], range(15,95), range(1,52))  # multiple files
+
+# ids of all segments for multiple labels files. All above forms can be used,
+# the following means ids 2, 3 and 6 from labels_1, ids 15-94 from labels_2
+# and ids 3, 4, ... 8 from labels_3
+# Warning: it is likely to work, this form is not actively maintaned
+#all_ids = ([2, 3, 6], range(15,95), range(3,9))  # multiple files
 
 # ids of vesicles in the labels file, all formats available for all_ids are
 # accepted here also.
@@ -166,12 +173,13 @@ check_vesicles = True
 
 # id shift in each subsequent labels (in case of multiple labels files) 
 #shift = None     # shift is determined automatically
-shift = None
+shift = 256
 
 # id of a segment to which distances are caluculated. In case of multiple
 # labels files this id is understood after the ids of the labels files are
 # shifted.
-distance_id = 2   # distances are not calculated
+if tomo_info is not None: distance_id = tomo_info.distance_id
+#distance_id = None   # distances are not calculated
 #distance_id = 6
 
 # the way distance is calculated 
@@ -179,7 +187,7 @@ distance_id = 2   # distances are not calculated
 # analysis script as 
 # pyto.analysis.Vesicles.read(additional=['maxDistance', 'centerDistance'], ...)
 #distance_mode = 'mean'            # mean distance calculated
-distance_mode = ('mean', 'min', 'max')  # mean and min distances calculated
+distance_mode = ('mean', 'min')  # mean and min distances calculated
 
 # calculate radius statistics for major 2d slices; if True axis has to be
 # specified (experimental, meant for cryo-sections)
@@ -257,8 +265,8 @@ def analyze_vesicles(image, ves, ves_ids):
     """
 
     # vesicles density and morphology
-    ves.density, ves.meanDensity, ves.bkg, ves.tot = \
-                 image.getSegmentDensity(segment=ves, offset=labels_offset)
+    ves.density, ves.meanDensity, ves.bkg, ves.tot = (
+        image.getSegmentDensity(segment=ves, offset=labels_offset, ids=ves_ids))
     ves.mor = pyto.segmentation.Morphology(segments=ves.data, ids=ves_ids)
     ves.mor.getVolume()
     ves.mor.getRadius(doSlices=do_slices, axis=axis)
@@ -372,7 +380,7 @@ def is_multi_boundaries():
 
     Depreciated
     """
-    if isinstance(labels_file_name, str):
+    if isinstance(labels_file_name, basestring):
         return False
     elif isinstance(labels_file_name, (tuple, list)):
         return True
@@ -607,8 +615,8 @@ def write_res(ves, dist, mem, lum, file_name, ids=None, multi_ves_ids=None):
             dist_1 += ' %6s  ' % dist_mode
 
     # write results table head
-    tabHead = ["# Id      Vesicle density              Membrane density            Interior density     Vesicle Membrane " + dist_0 + "     Center               Radius         ",
-               "#     mean    std    min    max    mean   std    min    max    mean   std    min    max                  " + dist_1 + "x     y     z    mean std    min   max  "]
+    tabHead = ["# Id      Vesicle density                  Membrane density              Interior density         Vesicle Membrane   " + dist_0 + "    Center              Radius         ",
+               "#     mean    std    min    max        mean   std    min    max        mean   std    min    max                      " + dist_1 + " x     y     z   mean  std    min   max  "]
     tabHeadExt = ["    X-slice radius          Y-slice radius           Z-slice radius",
                   "mean std    min   max   mean std    min   max   mean std    min   max"]
     if do_slices:
@@ -650,7 +658,10 @@ def write_res(ves, dist, mem, lum, file_name, ids=None, multi_ves_ids=None):
                         + "#" + tot_line[0] + os.linesep)
 
     # write background results
-    bkgOutVars = [ves.bkg.mean, ves.bkg.std, ves.bkg.min, ves.bkg.max]
+    bkgOutVars = [
+        ves.bkg.mean[0], ves.bkg.std[0], ves.bkg.min[0], ves.bkg.max[0]]
+    print("bkgOutVars.mean[0]: ", ves.bkg.mean[0])
+    print("bkgOutVars.mean: ", ves.bkg.mean)
     bkgOutFormat = "# bkg %6.2f %5.2f %6.2f %6.2f"
     file_name.write((bkgOutFormat % tuple(bkgOutVars)) + os.linesep)
 
@@ -668,8 +679,10 @@ def write_res(ves, dist, mem, lum, file_name, ids=None, multi_ves_ids=None):
                  mem.meanDensity.min[-1], mem.meanDensity.max[-1],
                  lum.meanDensity.mean[-1], lum.meanDensity.std[-1],
                  lum.meanDensity.min[-1], lum.meanDensity.max[-1],
-                 ves.mor.meanRadius.mean, ves.mor.meanRadius.std,
-                 ves.mor.meanRadius.min, ves.mor.meanRadius.max]
+                 ves.mor.meanRadius.mean[0], ves.mor.meanRadius.std[0],
+                 ves.mor.meanRadius.min[0], ves.mor.meanRadius.max[0]]
+    print("ver.mor.meanRadius: ", ves.mor.meanRadius.mean)
+    print("ver.mor.meanRadius[0]: ", ves.mor.meanRadius.mean[0])
     avOutFormat = "# av  %6.2f %5.2f %6.2f %6.2f  %6.2f %5.2f %6.2f %6.2f" \
         + "  %6.2f %5.2f %6.2f %6.2f            " \
         + '         ' * len(dist) \
