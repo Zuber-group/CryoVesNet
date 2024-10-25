@@ -45,7 +45,7 @@ and adjust the value if needed, and comment out the other options.
 because they most likely arise from calculating denisty of a 0-volume segment
 and are also a consequence of the changed behavior of scipy. 
 
-$Id: connectors.py 1573 2019-06-17 15:26:02Z vladan $
+$Id$
 Author: Vladan Lucic 
 """
 from __future__ import unicode_literals
@@ -57,7 +57,7 @@ from builtins import range
 #from past.utils import old_div
 from past.builtins import basestring
 
-__version__ = "$Revision: 1573 $"
+__version__ = "$Revision$"
 
 import sys
 import os
@@ -134,7 +134,7 @@ if tomo_info is not None: labels_data_type = tomo_info.labels_data_type
 # labels file byteOrder ('<' for little-endian, '>' for big-endian)
 labels_byte_order = '<'
 
-# labels file array order ('FORTRAN' for x-axis fastest, 'C' for z-axis fastest)
+# labels file array order ('F' for x-axis fastest, 'C' for z-axis fastest)
 labels_array_order = 'F'
 
 # offset of labels in respect to the data (experimental)
@@ -150,7 +150,7 @@ labels_offset = None             # no offset
 do_segmentation_flag = True
 
 # threshold list (not needed if do_segmentation_flag is False)
-threshold = numpy.arange(-4, 0, 1)  
+threshold = numpy.arange(-5, 5, 1)
 
 # Currently not implemented
 # in addition to threshold list thresholds are also chosen dynamically, so that
@@ -327,14 +327,15 @@ class_1_mode = 'new'
 
 # classification 2
 class_2_type = 'contacted_ids'
-class_2_ids = [2] #### 1=AZ is treated like a vesicle, 2= AZ is treated seperately
+if tomo_info is not None: class_2_ids = [tomo_info.distance_id]
+#class_2_ids = [1]
 class_2_rest = True
-class_2_names = ['AZ', 'rest']
+class_2_names = ['tethers', 'connectors']
 
 # classification 3
 class_3_type = 'volume'
-class_3_volumes = [0, 520, 735, 1040, 1470,  2000]
-class_3_names = ['m520', 'm735', 'm1040', 'm1470', 'm2000']
+class_3_volumes = [0, 3, 1000, 200000]  # in pixels
+class_3_names = ['small', 'good', 'big']
 
 
 ###########################################################
@@ -383,7 +384,8 @@ where_distance_to = 'segmentation'
 # Region id, or if more than one distance region is specified, for each segment 
 # the distance to the closest region is calculated. In case of multiple labels 
 # files this id is understood after the ids of the labels files are shifted.
-distance_id = 2   # one region, two regions if also including tethers
+if tomo_info is not None: distance_id = tomo_info.distance_id
+#distance_id = 1   # one region
 #distance_id = range(2,20)   # multiple regions
 
 # the way distance is calculated ('center', 'mean' or 'min')
@@ -536,6 +538,8 @@ def do_segmentation(image, bound, bound_ids, sa_file_name, inset):
         thresh = threshold
     else:
         thresh = [threshold]
+    if len(thresh) == 0:
+        raise ValueError("Threshold parameter has no values") 
 
     # prepare for segmentation and analysis
     sa = SegmentationAnalysis(boundary=bound)

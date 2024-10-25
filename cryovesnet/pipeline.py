@@ -869,6 +869,50 @@ class Pipeline():
             self.clear_memory()
         print(f"saved labels to {self.full_labels_path.relative_to(self.dir)}")
 
+    def pyto_wrapper(self, input_array_name='last_output_array_name', range=(-4, 4, 1) , memkill=True):
+        """
+        run pyto on the full label file
+        """
+        print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: running pyto" + Style.RESET_ALL)
+        if input_array_name == 'last_output_array_name':
+            input_array_name = self.last_output_array_name
+        self.initialize_pyto()
+        # make symbloic link from  self.image_path to image_file_name = "../3d/tomo.rec"
+        image_symlink = self.pyto_dir / '3d' / 'tomo.mrc'
+        image_symlink.symlink_to(self.image_path)
+
+        # make symlink to full_labels.mrc
+        full_labels_symlink = self.pyto_dir / '3d'/ 'labels.mrc'
+        full_labels_symlink.symlink_to(self.full_labels_path)
+
+        # using sed to replace the max_sv_label in tomo_info.py
+        # laterTODO: do this in a more os agnostic way
+        max_sv_label = self.full_labels.max()
+        cmd = f"sed -i 's/max_sv_label = 516/max_sv_label = {max_sv_label}/g' {self.pyto_dir}/common/tomo_info.py"
+        os.system(cmd)
+        # cd cd self.pyto_dir/vesicles and run vesicles.py
+        os.chdir(self.pyto_dir / 'vesicles')
+        cmd = f"python vesicles.py"
+        os.system(cmd)
+        # cd ../layers/ and run layers.py
+        os.chdir(self.pyto_dir / 'layers')
+        cmd = f"python layers.py"
+        os.system(cmd)
+
+        # cd ../connector and sed threshold = numpy.arange(-5, 5, 1) to theshold = numpy.arange(range)
+        os.chdir(self.pyto_dir / 'connectors')
+        cmd = f"sed -i 's/threshold = numpy.arange(-5, 5, 1)/threshold = numpy.arange{range}/g' connectors.py"
+        os.system(cmd)
+        cmd = f"python connectors.py"
+        os.system(cmd)
+
+
+        # cmd = f"python {self.pyto_dir}/pyto.py -i {self.full_labels_path} -o {self.pyto_output_dir}"
+        # os.system(cmd)
+
+        if memkill:
+            self.clear_memory()
+        print(f"pyto output saved to {self.pyto_dir}")
     def evaluation(self, reference_path=None, prediction_path=None):
         self.set_array("image")
         self.set_array("cytomask")

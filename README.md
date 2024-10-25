@@ -161,6 +161,7 @@ You can use the following command to run the interactive cleaning of the sepecif
 <pre>
 pl.fix_spheres_interactively("final_vesicle_labels")
 </pre>
+You can watch the video of the interactive cleaning of the segmentation [here](https://movie.rupress.org/video/10.1083/jcb.202402169/video-1)
 
 ## Using Napari Tool without automation
 You can use the following script to run the pipeline.
@@ -171,6 +172,7 @@ pl = cryovesnet.Pipeline(dataset_directory,pattern="*.rec.nad")
 pl.setup_cryovesnet_dir(make_masks= False, initialize=True)
 pl.fix_spheres_interactively()
 </pre>
+Its might be helpful for you to watch the tutorial video on how to segment spherical vesicles from scratch using the napari tool [here](https://movie.rupress.org/video/10.1083/jcb.202402169/video-2)
 ## Windows users
 > GPU support for native Windows ended with TensorFlow 2.10. From TensorFlow 2.11 onwards, you have the following options:
 > 1. Install TensorFlow in Windows Subsystem for Linux 2 (WSL2)
@@ -200,22 +202,24 @@ This repository includes scripts or code from external packages. To ensure integ
 ## Citation
 
 If you utilize our software in your research, please acknowledge its use by citing this work. Our software may integrate or rely on various third-party tools; hence, we recommend citing those as appropriately detailed in their documentation.
-https://doi.org/10.1101/2024.02.26.582080
+https://doi.org/10.1083/jcb.202402169
 
 <details>
 <summary>Bibtex</summary>
 <p>
 
 ```bibtex
-@article{Khosrozadeh2024.02.26.582080,
+@article{Khosrozadeh2024,
     author = {Amin Khosrozadeh and Raphaela Seeger and Guillaume Witz and Julika Radecke and Jakob B. S{\o}rensen and Beno{\^\i}t Zuber},
     title = {CryoVesNet: A Dedicated Framework for Synaptic Vesicle Segmentation in Cryo Electron Tomograms},
-    elocation-id = {2024.02.26.582080},
-    year = {2024},
-    doi = {10.1101/2024.02.26.582080},
-    URL = {https://www.biorxiv.org/content/early/2024/02/28/2024.02.26.582080},
-    eprint = {https://www.biorxiv.org/content/early/2024/02/28/2024.02.26.582080.full.pdf},
-    journal = {bioRxiv}
+    journal = {Journal of Cell Biology},
+    volume = {224},
+    number = {1},
+    year = {2025},
+    doi = {10.1083/jcb.202402169},
+    URL = {https://doi.org/10.1083/jcb.202402169},
+    issn = {0021-9525},
+    eissn = {1540-8140}
 }
 ```
 </p>

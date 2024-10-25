@@ -28,7 +28,7 @@ and adjust the value if needed, and comment out the other options.
 because they most likely arise from calculating denisty of a 0-volume segment
 and are also a consequence of the changed behavior of scipy. 
 
-$Id: layers.py 1573 2019-06-17 15:26:02Z vladan $
+$Id$
 Author: Vladan Lucic 
 """
 from __future__ import unicode_literals
@@ -37,7 +37,7 @@ from builtins import zip
 #from builtins import str
 #from past.utils import old_div
 
-__version__ = "$Revision: 1573 $"
+__version__ = "$Revision$"
 
 import sys
 import os
@@ -115,7 +115,7 @@ if tomo_info is not None: boundaries_data_type = tomo_info.labels_data_type
 # boundaries file byteOrder ('<' for little-endian, '>' for big-endian)
 boundaries_byte_order = '<'
 
-# boundaries file array order ('FORTRAN' for x-axis fastest, 'C' for z-axis 
+# boundaries file array order ('F' for x-axis fastest, 'C' for z-axis 
 # fastest)
 boundaries_array_order = 'F'
 
@@ -163,15 +163,17 @@ layer_thickness = 1        # for layers from only
 # Needed if boundary_2 is None, or if boundary_id_2 is not None and 
 # layer_thickness is None
 num_layers = 200
+num_layers = 500
 
 # number of extra layers (on each side if layers between) formed on 
 # boundary(ies) and on extra_layers mask(s)
-#num_extra_layers = 0    # no extra regions
+# ? num_extra_layers = 0    # no extra regions
 num_extra_layers = 0
 
 # ids of a region where extra layers are formed (in addition to boundary_id_1),
 # or None for no extra layers on the boundary 1 side
-extra_layers_mask_id_1 = 67
+# ? extra_layers_mask_id_1 = None
+extra_layers_mask_id_1 = None
 
 # ids of a region where extra layers are formed (in addition to boundary_id_2),
 # or None for no extra layers on the boundary 2 side
@@ -220,10 +222,10 @@ if tomo_info is not None: segments_data_type = tomo_info.labels_data_type
 segments_byte_order = None
 #segments_byte_order = '<'
 
-# segments file array order ('FORTRAN' for x-axis fastest, 'C' 
+# segments file array order ('F' for x-axis fastest, 'C' 
 # for z-axis fastest)
 segments_array_order = None
-#segments_array_order = 'FORTRAN'
+#segments_array_order = 'F'
 
 # offset of segments in respect to the data 
 segments_offset = boundaries_offset # segments same as boundaries file

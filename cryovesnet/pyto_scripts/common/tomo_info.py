@@ -14,13 +14,13 @@ Each parameter should be read using a statement like:
 
 Parameters can have their values redefined in the individual scripts, if needed.
 
-$Id: tomo_info.py 1573 2019-06-17 15:26:02Z vladan $
+$Id$
 Author: Vladan Lucic 
 """
 from __future__ import unicode_literals
 from builtins import range
 
-__version__ = "$Revision: 1573 $"
+__version__ = "$Revision$"
 
 
 ############################################################
@@ -31,7 +31,7 @@ __version__ = "$Revision: 1573 $"
 #
 
 # name of the image file
-image_file_name = "../3d/Dummy_133.rec.nad.rec"
+image_file_name = "../3d/tomo.mrc"
 
 ###############################################################
 #
@@ -39,14 +39,13 @@ image_file_name = "../3d/Dummy_133.rec.nad.rec"
 # 
 
 # name of the labels file containing boundaries
-labels_file_name = "../3d/labels_fixed.mrc"
-max_sv_label = 491 #in practice, this is the maximum gray value in the labels file.
-
+labels_file_name = "../3d/labels.mrc"
+max_sv_label = 516
 # labels file data type (e.g. 'int8', 'uint8', 'int16', 'int32', 'float16', 
 # 'float64')
 # For mrc and em files this should be set to None, otherwise it will override
 # the data type specified in the header.
-labels_data_type = 'int16'
+labels_data_type = 'uint16'
 
 #####################################################################
 #
@@ -57,16 +56,17 @@ labels_data_type = 'int16'
 # Segments that are not listed here are removed, that is set to 0. In order to
 # avoid possible problems, all boundary file segments should be specified here, 
 # or no other segment (boundary or segmentation region) should have id 0.
-all_ids =  [1,2] + list(range(10,max_sv_label+1)) 
+#all_ids = [2,3] + list(range(9,max_sv_label))
+all_ids = [1,2] + list(range(10,max_sv_label+1))
 
 # Ids of all boundaries defined in the labels file. Nested list can be used 
-# where ids in a sublist are uderstood in the "or" sense, that is all boundaries 
+# where ids in a sublist are uderstood in the "or" sense, that is all boundaries
 # listed in a sublist form effectivly a single boundary
+#boundary_ids = [2] + list(range(9,max_sv_label))
 boundary_ids = [2] + list(range(10,max_sv_label+1))
-
 # Ids of vesicles in the labels file
-vesicle_ids = list(range(10,max_sv_label+1))   
-
+#vesicle_ids = list(range(9,max_sv_label))
+vesicle_ids = list(range(10,max_sv_label+1))
 # Id of the segmentation region (where connectors can be formed). Using 0 in
 # case the segmentation region is not specified in the boundary file is
 # discouraged. 
