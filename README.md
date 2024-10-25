@@ -195,9 +195,20 @@ We have tested the pipeline on a Macbook Pro M1 without any GPU utilization, and
 ## Train and create your own dataset
 The notebooks allow to [generate the training data](notebooks/create_trainingset.ipynb) and [train the network](notebooks/training_vesicles.ipynb). Pre-trained weights for the network are provided in the weights folder.
 
-## Pyto
+## Segmentation of connectors and tethers
 
 This repository includes scripts or code from external packages. To ensure integration or extended capabilities, inclusions is from the [Pyto](https://github.com/vladanl/Pyto) project. In case you want to segment the connectors and tethers afterwards you can use this software.
+For initializitng the direcoty you can use the following command:
+<pre>
+pl.initialize_pyto_dir()
+</pre>
+and then update the corresponding .py files and run it as disscussed in the [Pyto](https://github.com/vladanl/Pyto/blob/master/doc/manuals/presynaptic_example.pdf) documentation.
+
+For enhancing the automation of the pipeline, you can use the following command to run the Pyto wrapper.
+<pre>
+pl.pyto_wrapper()
+</pre>
+
 
 ## Citation
 
