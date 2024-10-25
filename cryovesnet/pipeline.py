@@ -876,28 +876,28 @@ class Pipeline():
         print(Style.BRIGHT + Fore.BLUE + "CryoVesNet Pipeline: running pyto" + Style.RESET_ALL)
         if input_array_name == 'last_output_array_name':
             input_array_name = self.last_output_array_name
-        # self.initialize_pyto()
-        #make symbloic link from  self.image_path to image_file_name = "../3d/tomo.rec"
-        # image_symlink = self.pyto_dir / '3d' / 'tomo.mrc'
-        # image_symlink.symlink_to(self.image_path)
-        #
-        # # make symlink to full_labels.mrc
-        # full_labels_symlink = self.pyto_dir / '3d'/ 'labels.mrc'
-        # full_labels_symlink.symlink_to(self.full_labels_path)
-        #
-        # # using sed to replace the max_sv_label in tomo_info.py
-        # # TODO: do this in a more os agnostic way
-        # max_sv_label = self.full_labels.max()
-        # cmd = f"sed -i 's/max_sv_label = 516/max_sv_label = {max_sv_label}/g' {self.pyto_dir}/common/tomo_info.py"
-        # os.system(cmd)
-        # # cd cd self.pyto_dir/vesicles and run vesicles.py
-        # os.chdir(self.pyto_dir / 'vesicles')
-        # cmd = f"python vesicles.py"
-        # os.system(cmd)
-        # # cd ../layers/ and run layers.py
-        # os.chdir(self.pyto_dir / 'layers')
-        # cmd = f"python layers.py"
-        # os.system(cmd)
+        self.initialize_pyto()
+        # make symbloic link from  self.image_path to image_file_name = "../3d/tomo.rec"
+        image_symlink = self.pyto_dir / '3d' / 'tomo.mrc'
+        image_symlink.symlink_to(self.image_path)
+
+        # make symlink to full_labels.mrc
+        full_labels_symlink = self.pyto_dir / '3d'/ 'labels.mrc'
+        full_labels_symlink.symlink_to(self.full_labels_path)
+
+        # using sed to replace the max_sv_label in tomo_info.py
+        # laterTODO: do this in a more os agnostic way
+        max_sv_label = self.full_labels.max()
+        cmd = f"sed -i 's/max_sv_label = 516/max_sv_label = {max_sv_label}/g' {self.pyto_dir}/common/tomo_info.py"
+        os.system(cmd)
+        # cd cd self.pyto_dir/vesicles and run vesicles.py
+        os.chdir(self.pyto_dir / 'vesicles')
+        cmd = f"python vesicles.py"
+        os.system(cmd)
+        # cd ../layers/ and run layers.py
+        os.chdir(self.pyto_dir / 'layers')
+        cmd = f"python layers.py"
+        os.system(cmd)
 
         # cd ../connector and sed threshold = numpy.arange(-5, 5, 1) to theshold = numpy.arange(range)
         os.chdir(self.pyto_dir / 'connectors')
