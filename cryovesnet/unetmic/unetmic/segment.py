@@ -100,9 +100,9 @@ def full_segmentation(unet_weigth_path, path_to_file, folder_to_save, rescale=1,
     image = umic.load_raw(path_to_file)
     # rescale
     if rescale != 1:
-        image = skimage.transform.rescale(image, scale=rescale, preserve_range=True).astype(np.int16)
+        image = skimage.transform.rescale(image, scale=rescale, preserve_range=True).astype(image.dtype)
     if gauss:
-        image = skimage.filters.gaussian(image, sigma=1 ,  preserve_range=True).astype(np.int16)
+        image = skimage.filters.gaussian(image, sigma=1 ,  preserve_range=True).astype(image.dtype)
 
     if (rescale != 1) or gauss:
         skimage.io.imsave(os.path.normpath(folder_to_save) + '/' + os.path.splitext(os.path.split(path_to_file)[1])[
